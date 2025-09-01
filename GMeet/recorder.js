@@ -172,10 +172,12 @@ function createRecorderPanel() {
 
   console.log("🎥 Recorder panel added (floating top-right)");
 }
-
-// Code to only run on Meet pages
-if (location.hostname === "meet.google.com") {
-  window.addEventListener("load", () => setTimeout(createRecorderPanel, 3000));
+  
+// Only run on Meet pages
+const pathParts = location.pathname.split("/").filter(Boolean);
+if (pathParts.length === 1 && /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/i.test(pathParts[0])) {
+  createRecorderPanel();
 }
+
 
 
