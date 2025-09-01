@@ -6,7 +6,7 @@ let panel; // Floating control panel
 // Recorder function
 async function startMeetRecorder() {
   try {
-    console.log("🎥 Recorder is starting");
+    console.log("🎥 Recorder is starting click the tab to record it");
 
     if (mediaRecorder && mediaRecorder.state === "recording") {
       console.warn("🎥 Recorder is already running...");
@@ -87,7 +87,9 @@ async function startMeetRecorder() {
     };
 
     mediaRecorder.start(1000);
-    console.log("🎥 Recording has started...");
+    console.log("%c🎥 Recording has started...",
+      "color: green; font-weight: bold;"
+    );
 
   } catch (err) {
     console.error("Failed to start recording:", err);
@@ -120,7 +122,9 @@ async function stopMeetRecorder() {
     await ctx.close();
   }
 
-  console.log("🎥 Recording has stopped. \nFile will be downloaded now...");
+  console.log("%c🎥 Recording has stopped. \nFile will be downloaded now...",
+    "color: green; font-weight: bold;"
+  );
 }
 
 // Floating UI - to start and stop recording
@@ -178,6 +182,5 @@ const pathParts = location.pathname.split("/").filter(Boolean);
 if (pathParts.length === 1 && /^[a-z]{3}-[a-z]{4}-[a-z]{3}$/i.test(pathParts[0])) {
   createRecorderPanel();
 }
-
 
 
