@@ -5,17 +5,16 @@ let panel;
 let recordMode = localStorage.getItem("meetRecordMode") || "both";
 let statusIndicator;
 
-
+// Start Recorder
 async function startMeetRecorder() {
   try {
-    console.log(`🎥 Recorder starting in mode: ${recordMode}`);
+    console.log(`🎥 Recorder is in mode: ${recordMode.toUpperCase()}`);
 
     if (mediaRecorder && mediaRecorder.state === "recording") {
-      console.warn(`🎥 Recorder already running in mode: ${recordMode}`);
+      console.warn(`🎥 Recorder is already running in mode: ${recordMode.toUpperCase()}`);
       return;
     }
 
-    console.log(`🎥 Starting recording in mode: ${recordMode.toUpperCase()}`);
 
     let finalStreamTracks = [];
 
@@ -72,7 +71,6 @@ async function startMeetRecorder() {
       document.body.appendChild(a);
       a.click();
       setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
-      console.log(`🎥 Recording stopped for mode: ${recordMode.toUpperCase()}`);
       updateStatus(false);
     };
 
@@ -84,7 +82,7 @@ async function startMeetRecorder() {
     };
 
     mediaRecorder.start(1000);
-    console.log(`%c🎥 Recording started in mode: ${recordMode.toUpperCase()}`, "color: green; font-weight: bold;");
+    console.log(`%c🎥 Recording has started in the mode: ${recordMode.toUpperCase()}`, "color: green; font-weight: bold;");
     updateStatus(true);
   } catch (err) {
     console.error("Recording start failed:", err);
@@ -95,7 +93,7 @@ async function startMeetRecorder() {
   }
 }
 
-// --- Stop Recorder ---
+// Stop Recorder
 async function stopMeetRecorder() {
   if (!mediaRecorder || mediaRecorder.state !== "recording") {
     console.warn(`No recording in progress for mode: ${recordMode.toUpperCase()}`);
@@ -108,7 +106,7 @@ async function stopMeetRecorder() {
   updateStatus(false);
 }
 
-// --- Update status indicator ---
+// Update status indicator 
 function updateStatus(isRecording) {
   if (!statusIndicator) return;
   statusIndicator.textContent = `Mode: ${recordMode.toUpperCase()} | ${isRecording ? "Recording ⬤" : "Idle ○"}`;
@@ -129,37 +127,39 @@ function createRecorderPanel() {
     boxShadow: "0 2px 6px rgba(0,0,0,0.3)"
   });
 
-  // Status indicator
-  statusIndicator = document.createElement("div");
-  Object.assign(statusIndicator.style, { margin: "5px", fontSize: "12px", color: "#fff" });
-  panel.appendChild(statusIndicator);
-  updateStatus(false);
+// Status indicator
+statusIndicator = document.createElement("div");
+Object.assign(statusIndicator.style, { margin: "5px", fontSize: "12px", color: "#fff" });
+panel.appendChild(statusIndicator);
+updateStatus(false);
 
-  // --- Dropdown for mode selection ---
-  const select = document.createElement("select");
-  ["video", "audio", "both"].forEach(mode => {
-    const option = document.createElement("option");
-    option.value = mode;
-    option.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
-    if (mode === recordMode) option.selected = true;
-    select.appendChild(option);
-  });
-  Object.assign(select.style, { margin: "5px", padding: "4px 8px", borderRadius: "6px", cursor: "pointer" });
+// Dropdown for mode selection  
+const select = document.createElement("select");
+["video", "audio", "both"].forEach(mode => {
+  const option = document.createElement("option");
+  option.value = mode;
+  option.textContent = mode.charAt(0).toUpperCase() + mode.slice(1);
+  if (mode === recordMode) option.selected = true;
+  select.appendChild(option);
+});
+Object.assign(select.style, { margin: "5px", padding: "4px 8px", borderRadius: "6px", cursor: "pointer" });
 
-  select.onchange = () => {
-    recordMode = select.value;
-    localStorage.setItem("meetRecordMode", recordMode);
-    updateStatus(mediaRecorder?.state === "recording");
-  };
+select.onchange = () => {
+  recordMode = select.value;
+  localStorage.setItem("meetRecordMode", recordMode);
+  updateStatus(mediaRecorder?.state === "recording");
+};
 
-  panel.appendChild(select);
+panel.appendChild(select);
 
-  // --- Start / Stop buttons ---
-  const startBtn = document.createElement("button");
-  startBtn.textContent = "▶️ Start";
-  Object.assign(startBtn.style, { margin: "5px", padding: "6px 12px", background: "#1a73e8", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s ease", // smoother transition
-  boxShadow: "0 2px 4px rgba(0,0,0,0.3)"});
-  startBtn.onmouseover = () => {
+// Start / Stop buttons
+
+const startBtn = document.createElement("button");
+startBtn.textContent = "▶️ Start";
+Object.assign(startBtn.style, { margin: "5px", padding: "6px 12px", background: "#1a73e8", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s ease", // smoother transition
+boxShadow: "0 2px 4px rgba(0,0,0,0.3)" });
+
+startBtn.onmouseover = () => {
   startBtn.style.transform = "scale(1.1)"; 
   startBtn.style.boxShadow = "0 4px 8px rgba(0,0,0,0.4)"; 
   startBtn.style.backgroundColor = "#1669c1"; 
@@ -169,13 +169,15 @@ startBtn.onmouseout = () => {
   startBtn.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
   startBtn.style.backgroundColor = "#1a73e8";
 };
-  startBtn.onclick = () => startMeetRecorder();
 
-  const stopBtn = document.createElement("button");
-  stopBtn.textContent = "⏹ Stop";
-  Object.assign(stopBtn.style, { margin: "5px", padding: "6px 12px", background: "#d93025", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer",transition: "all 0.2s ease",
-  boxShadow: "0 2px 4px rgba(0,0,0,0.3)" });
-    stopBtn.onmouseover = () => {
+startBtn.onclick = () => startMeetRecorder();
+
+const stopBtn = document.createElement("button");
+stopBtn.textContent = "⏹ Stop";
+Object.assign(stopBtn.style, { margin: "5px", padding: "6px 12px", background: "#d93025", color: "#fff", border: "none", borderRadius: "6px", cursor: "pointer", transition: "all 0.2s ease",
+boxShadow: "0 2px 4px rgba(0,0,0,0.3)" });
+
+stopBtn.onmouseover = () => {
   stopBtn.style.transform = "scale(1.1)";
   stopBtn.style.boxShadow = "0 4px 8px rgba(0,0,0,0.4)";
   stopBtn.style.backgroundColor = "#b92b20"; 
@@ -185,13 +187,14 @@ stopBtn.onmouseout = () => {
   stopBtn.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
   stopBtn.style.backgroundColor = "#d93025";
 };
-  stopBtn.onclick = () => stopMeetRecorder();
 
-  panel.appendChild(startBtn);
-  panel.appendChild(stopBtn);
+stopBtn.onclick = () => stopMeetRecorder();
 
-  document.body.appendChild(panel);
-  console.log("🎥 Recorder panel added");
+panel.appendChild(startBtn);
+panel.appendChild(stopBtn);
+
+document.body.appendChild(panel);
+console.log("🎥 Recorder panel added");
 
 }
 
