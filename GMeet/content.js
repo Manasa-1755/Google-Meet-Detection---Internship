@@ -37,12 +37,12 @@
       meetingStarted = false;
       console.log(
         `%c📢 Meeting Ended at ${getCurrentTime()}`,
-        "color: red; font-weight: bold;"
+        "color: #ef392cff; font-weight: bold;"
       );
       if (startTime && endTime) {
         console.log(
           `%c⏱ Meeting Duration: ${formatDuration(endTime - startTime)}`,
-          "color: blue; font-weight: bold;"
+          "color: #5d8ee9ff; font-weight: bold;"
         );
       }
     }
