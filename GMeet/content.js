@@ -1,8 +1,10 @@
-// FOR MEETING DETECTION
+// --- MEETING DETECTION (Stable Version) ---
 (function () {
   let meetingStarted = false;
   let startTime = null;
   let endTime = null;
+  let leaveButtonMissingSince = null;
+  const END_THRESHOLD = 3000; // ms (3s) to confirm meeting ended
 
   // Utility: get current time as hh:mm:ss
   function getCurrentTime() {
@@ -48,23 +50,28 @@
     }
   }
 
-  // MutationObserver: Watch for "Leave call" button disappearance as signal
-  const observer = new MutationObserver(() => {
+  // Function: check meeting state
+  function checkMeeting() {
     const leaveButton = document.querySelector(
       '[aria-label^="Leave call"], [aria-label^="Leave meeting"]'
     );
-    if (leaveButton) {
-      meetingStart(); // Meeting in progress
-    } else {
-      meetingEnd(); // Left or ended
-    }
-  });
 
-  // Observe the whole document body for changes
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-  });
+    if (leaveButton) {
+      leaveButtonMissingSince = null;
+      meetingStart();
+    } else {
+      if (!leaveButtonMissingSince) {
+        // mark when button disappeared
+        leaveButtonMissingSince = Date.now();
+      } else if (Date.now() - leaveButtonMissingSince > END_THRESHOLD) {
+        // only end if button is gone for > threshold
+        meetingEnd();
+      }
+    }
+  }
+
+  // Run check every second
+  setInterval(checkMeeting, 1000);
 
   console.log(
     "%c✅ Meeting tracker initialized. Waiting for changes...",
