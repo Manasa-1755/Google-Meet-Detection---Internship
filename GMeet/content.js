@@ -1,17 +1,16 @@
-// --- MEETING DETECTION (Stable Version) ---
+
+
 (function () {
   let meetingStarted = false;
   let startTime = null;
   let endTime = null;
   let leaveButtonMissingSince = null;
-  const END_THRESHOLD = 3000; // ms (3s) to confirm meeting ended
+  const END_THRESHOLD = 3000; // ms (3s)
 
-  // Utility: get current time as hh:mm:ss
+  // Utils
   function getCurrentTime() {
     return new Date().toLocaleTimeString();
   }
-
-  // Utility: format duration (ms → hh:mm:ss)
   function formatDuration(ms) {
     let totalSeconds = Math.floor(ms / 1000);
     let hours = Math.floor(totalSeconds / 3600);
@@ -20,7 +19,7 @@
     return `${hours}h ${minutes}m ${seconds}s`;
   }
 
-  // Function: when meeting starts
+  // Meeting start
   function meetingStart() {
     if (!meetingStarted) {
       meetingStarted = true;
@@ -29,28 +28,31 @@
         `%c📢 Meeting Started at ${getCurrentTime()}`,
         "color: green; font-weight: bold;"
       );
+      startMeetRecorder();
     }
   }
 
-  // Function: when meeting ends
+  // Meeting end
   function meetingEnd() {
     if (meetingStarted) {
       endTime = new Date();
       meetingStarted = false;
       console.log(
         `%c📢 Meeting Ended at ${getCurrentTime()}`,
-        "color: #ef392cff; font-weight: bold;"
+        "color: #ef392c; font-weight: bold;"
       );
+
       if (startTime && endTime) {
         console.log(
           `%c⏱ Meeting Duration: ${formatDuration(endTime - startTime)}`,
-          "color: #5d8ee9ff; font-weight: bold;"
+          "color: #5d8ee9; font-weight: bold;"
         );
       }
+      stopMeetRecorder();
     }
   }
 
-  // Function: check meeting state
+  // Check meeting state
   function checkMeeting() {
     const leaveButton = document.querySelector(
       '[aria-label^="Leave call"], [aria-label^="Leave meeting"]'
@@ -61,20 +63,19 @@
       meetingStart();
     } else {
       if (!leaveButtonMissingSince) {
-        // mark when button disappeared
         leaveButtonMissingSince = Date.now();
       } else if (Date.now() - leaveButtonMissingSince > END_THRESHOLD) {
-        // only end if button is gone for > threshold
         meetingEnd();
       }
     }
   }
 
-  // Run check every second
+  // Run every second
   setInterval(checkMeeting, 1000);
 
   console.log(
-    "%c✅ Meeting tracker initialized. Waiting for changes...",
+    "%c✅ Meeting tracker + recorder initialized. Waiting for changes...",
     "color: orange; font-weight: bold;"
   );
 })();
+
