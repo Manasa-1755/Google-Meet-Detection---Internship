@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body {
+     font-family: Arial, sans-serif; 
+     width: 240px; 
+     padding: 10px; 
+     background: #0e0e0e;
+    }
+    .modes { 
+      display: flex; 
+      justify-content: space-between; 
+      margin: 10px 0; 
+    }
+    .toggle {
+      flex: 1;
+      margin: 2px;
+      padding: 6px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      cursor: pointer;
+      text-align: center;
+      user-select: none;
+      background: #f0f0f0;
+      transition: background 0.2s, color 0.2s;
+    }
+    .toggle.active {
+      background: #1a73e8;
+      color: white;
+      border-color: #1a73e8;
+      font-weight: bold;
+    }
+    button {
+      margin: 5px 0;
+      width: 100%;
+      padding: 8px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    #start { 
+        background: #1a73e8; 
+        color: #fff; 
+    }
+    #stop { 
+        background: #d93025; 
+        color: #fff; 
+    }
+    #save {
+      background: #34a853; 
+      color: #fff;
+     }
+    #status { 
+      margin-top: 10px; 
+      font-size: 13px; 
+      color: white;
+      font-weight: bold; 
+    }
+    #label{
+      color: white;
+      font-weight: bold;
+    }
+    
+  </style>
+</head>
+<body>
+  <label id="label">Mode:</label>
+  <div class="modes">
+    <div id="videoBtn" class="toggle">Video</div>
+    <div id="audioBtn" class="toggle">Audio</div>
+    <div id="bothBtn" class="toggle">Audio + Video</div>
+  </div>
+
+  <button id="save">Save Recording</button>
+
+  <script src="popup.js"></script>
+</body>
+</html>
