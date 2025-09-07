@@ -7,11 +7,13 @@
      width: 240px; 
      padding: 10px; 
      background: #0e0e0e;
+     color: white;
     }
     .modes { 
       display: flex; 
       justify-content: space-between; 
       margin: 10px 0; 
+      color: black
     }
     .toggle {
       flex: 1;
@@ -62,6 +64,11 @@
       color: white;
       font-weight: bold;
     }
+    #autoToggleWrapper{
+      margin: 10px 0;
+      color: white;
+      font-weight: bold;
+    }
     
   </style>
 </head>
@@ -73,8 +80,18 @@
     <div id="bothBtn" class="toggle">Audio + Video</div>
   </div>
 
+  <div id="autoToggleWrapper">
+    <label>
+    <input type="checkbox" id="autoToggle"/>
+    Auto Record
+    </label>
+  </div>
+
+  <button id="start">Start Recording</button>
+  <button id="stop">Stop Recording</button>
   <button id="save">Save Recording</button>
 
+  <div id="status"></div>
   <script src="popup.js"></script>
 </body>
 </html>
