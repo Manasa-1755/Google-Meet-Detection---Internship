@@ -12,11 +12,11 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentMode = "audio+video";
 
   // Load saved mode + auto setting
-  chrome.storage.local.get(["meetRecordMode", "autoRecord"], ({ meetRecordMode, autoRecord }) => {
+  chrome.storage.local.get(["meetRecordMode", "meetAutoRecord"], ({ meetRecordMode, meetAutoRecord }) => {
     if (meetRecordMode) setActiveMode(meetRecordMode);
     else setActiveMode("audio+video");
 
-    autoToggle.checked = (autoRecord === undefined) ? true : autoRecord;
+    autoToggle.checked = (meetAutoRecord === undefined) ? false : meetAutoRecord;
     updateUI();
   });
 
@@ -39,7 +39,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Auto toggle
   autoToggle.onchange = () => {
-    chrome.storage.local.set({ autoRecord: autoToggle.checked });
+    chrome.storage.local.set({ meetAutoRecord: autoToggle.checked });
     updateUI();
   };
 
