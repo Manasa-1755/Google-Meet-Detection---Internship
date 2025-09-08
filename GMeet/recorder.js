@@ -109,6 +109,19 @@ function onMeetDetected() {
 
 // --- Start recording ---
 async function startMeetRecorder() {
+
+  function attachStopSharingHandler(stream) {
+  if (!stream) return;
+  stream.getTracks().forEach(track => {
+    console.log(`📡 Attached onended handler to ${track.kind} track`);
+    track.onended = () => {
+      console.log("⏹ User clicked Stop sharing. Recording stopped.");
+      stopMeetRecorder();
+    };
+  });
+}
+
+
   try {
     recordMode = await new Promise(resolve => {
       chrome.storage.local.get("meetRecordMode", ({ meetRecordMode }) =>
@@ -135,6 +148,9 @@ async function startMeetRecorder() {
           video: { frameRate: 30 },
           audio: false
         });
+
+        attachStopSharingHandler(displayStream);
+
         finalStreamTracks.push(...displayStream.getVideoTracks());
       } catch (error) {
         console.warn("User cancelled screen sharing");
@@ -148,6 +164,7 @@ async function startMeetRecorder() {
         micStream = await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: true, noiseSuppression: true }
         });
+
         finalStreamTracks.push(...micStream.getAudioTracks());
       } catch (error) {
         console.warn("User denied microphone access");
@@ -162,6 +179,8 @@ async function startMeetRecorder() {
           video: { frameRate: 30 },
           audio: true
         });
+
+        attachStopSharingHandler(displayStream);
       } catch (err) {
         console.warn("❌ User cancelled screen share (audio+video).");
         return;
@@ -186,6 +205,8 @@ async function startMeetRecorder() {
         );
         tabSource.connect(dest);
       }
+
+
 
       if (micStream.getAudioTracks().length) {
         const micSource = ctx.createMediaStreamSource(
