@@ -278,6 +278,7 @@ async function stopMeetRecorder() {
 function saveRecording() {
   if (!chunks.length) {
     alert("No recording available to save.");
+    console.log("⚠️ No recording data to save.");
     return;
   }
   const blob = new Blob(chunks, { type: mediaRecorder?.mimeType || "video/webm" });
@@ -330,4 +331,3 @@ function showRecordingPopup(message) {
   }, 5000);
 
 }
-
