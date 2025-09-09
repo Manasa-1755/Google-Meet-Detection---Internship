@@ -87,7 +87,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     sendResponse({ status: "Saved" });
   } 
   else if(msg.command === "start") {
-    startMeetRecorder(); // only start when user clicks 
+    startMeetRecorder(true); // pass manual=true
     sendResponse({ status: "Started" });
   } 
   else if(msg.command === "stop") {
@@ -108,7 +108,16 @@ function onMeetDetected() {
 }
 
 // --- Start recording ---
-async function startMeetRecorder() {
+async function startMeetRecorder(manual = false) {
+  if (!autoRecord && !manual) {
+    console.log("⚠️ Ignored auto start because manual mode is active.");
+    return;
+  }
+
+  if (mediaRecorder && mediaRecorder.state === "recording") {
+    console.warn("🎥 Already recording, ignoring duplicate start.");
+    return;
+  }
 
   function attachStopSharingHandler(stream) {
   if (!stream) return;
@@ -321,3 +330,4 @@ function showRecordingPopup(message) {
   }, 5000);
 
 }
+
