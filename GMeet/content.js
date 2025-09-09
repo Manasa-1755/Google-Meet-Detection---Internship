@@ -1,11 +1,7 @@
-
-
 (function () {
   let meetingStarted = false;
   let startTime = null;
   let endTime = null;
-  let leaveButtonMissingSince = null;
-  const END_THRESHOLD = 3000; // ms (3s)
 
   // Utils
   function getCurrentTime() {
@@ -52,30 +48,37 @@
     }
   }
 
-  // Check meeting state
-  function checkMeeting() {
-    const leaveButton = document.querySelector(
+  // Detect meeting state (button presence)
+  function isMeetingActive() {
+    return document.querySelector(
       '[aria-label^="Leave call"], [aria-label^="Leave meeting"]'
     );
+  }
+
+  // MutationObserver setup 
+  const observer = new MutationObserver(() => {
+    const leaveButton = isMeetingActive();
 
     if (leaveButton) {
-      leaveButtonMissingSince = null;
-      meetingStart();
+      if (!meetingStarted) {
+        meetingStart();
+      }
     } else {
-      if (!leaveButtonMissingSince) {
-        leaveButtonMissingSince = Date.now();
-      } else if (Date.now() - leaveButtonMissingSince > END_THRESHOLD) {
+      if (meetingStarted) {
         meetingEnd();
       }
     }
-  }
+  });
 
-  // Run every second
-  setInterval(checkMeeting, 1000);
+  // Start observing the document
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+  });
 
   console.log(
-    "%c✅ Meeting tracker + recorder initialized. Waiting for changes...",
+    "%c✅ Meeting tracker (MutationObserver) initialized. Watching for DOM changes...",
     "color: orange; font-weight: bold;"
   );
 })();
-
