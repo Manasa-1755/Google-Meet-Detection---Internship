@@ -1,3 +1,4 @@
+
 let displayStream, micStream, mediaRecorder, chunks = [];
 let ctx;
 let recordMode = "audio+video"; // default
@@ -6,7 +7,17 @@ let recordingTimerInterval = null;
 let recordingStartTime = null;
 let autoRecord = false; // true = auto, false = manual
 
-// --- Load auto/manual preference ---
+// Helper: capture current tab 
+function captureTab(video = true, audio = false) {
+  return new Promise((resolve, reject) => {
+    chrome.tabCapture.capture({ video, audio }, stream => {
+      if (!stream) reject(chrome.runtime.lastError);
+      else resolve(stream);
+    });
+  });
+}
+
+// Load auto/manual preference 
 function initRecorder(){
   chrome.storage.local.get("meetAutoRecord", ({ meetAutoRecord }) => {
     autoRecord = meetAutoRecord ?? false;
@@ -17,8 +28,6 @@ function initRecorder(){
       console.log("📌 Meet detected on load.");
       if(autoRecord){
         console.log("📌 Auto-record enabled, starting recorder...");
-        console.log("AutoRecord:", autoRecord, "Meet Active:", isMeetActive());
-
         startMeetRecorder();
       } else {
         console.log("📌 Manual mode: waiting for START click...");
@@ -30,7 +39,7 @@ function initRecorder(){
 // Initialize
 initRecorder();
 
-// --- Live "Recording + Timing" Popup ---
+// Live "Recording + Timing" Popup
 function showRecordingTimerPopup() {
   if (recordingPopupEl) return;
 
@@ -66,7 +75,7 @@ function showRecordingTimerPopup() {
   }, 1000);
 }
 
-// --- Stop & remove recording popup ---
+// Stop & remove recording popup
 function hideRecordingTimerPopup() {
   if (recordingTimerInterval) clearInterval(recordingTimerInterval);
   recordingTimerInterval = null;
@@ -80,7 +89,7 @@ function hideRecordingTimerPopup() {
 
 console.log(`🎥 Recorder initialized`);
 
-// --- Listen for popup commands ---
+// Listen for popup commands
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg.command === "save") {
     saveRecording();
@@ -97,7 +106,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   return true;
 });
 
-// --- Meet detection hook ---
+// Meet detection hook 
 function onMeetDetected() {
   if (autoRecord) {
     console.log("📌 Meet detected, auto-recording enabled. Starting recorder...");
@@ -107,7 +116,7 @@ function onMeetDetected() {
   }
 }
 
-// --- Start recording ---
+// Start recording 
 async function startMeetRecorder(manual = false) {
   if (!autoRecord && !manual) {
     console.log("⚠️ Ignored auto start because manual mode is active.");
@@ -150,7 +159,7 @@ async function startMeetRecorder(manual = false) {
     chunks = [];
     let finalStreamTracks = [];
 
-    // --- Video only ---
+    // Video only
     if (recordMode === "video") {
       try {
         displayStream = await navigator.mediaDevices.getDisplayMedia({
@@ -167,7 +176,7 @@ async function startMeetRecorder(manual = false) {
       }
     }
 
-    // --- Audio only ---
+    // Audio only 
     if (recordMode === "audio") {
       try {
         micStream = await navigator.mediaDevices.getUserMedia({
@@ -181,7 +190,7 @@ async function startMeetRecorder(manual = false) {
       }
     }
 
-    // --- Both ---
+    // Both 
     if (recordMode === "audio+video") {
       try {
         displayStream = await navigator.mediaDevices.getDisplayMedia({
@@ -245,8 +254,8 @@ async function startMeetRecorder(manual = false) {
 
     if(mediaRecorder && mediaRecorder.state === "recording"){
       console.log(`✅ Recording started (${recordMode.toUpperCase()})`);
-      showRecordingPopup(`🎥 Recording started (${recordMode.toUpperCase()})`);
       showRecordingTimerPopup();
+      showRecordingPopup(`🎥 Recording started (${recordMode.toUpperCase()})`);
     } else{
       console.warn("Recording did not start properly.");
     }
@@ -257,7 +266,7 @@ async function startMeetRecorder(manual = false) {
   }
 }
 
-// --- Stop recording ---
+// Stop recording 
 async function stopMeetRecorder() {
   hideRecordingTimerPopup();
 
@@ -274,7 +283,7 @@ async function stopMeetRecorder() {
   }
 }
 
-// --- Save manually ---
+// Save manually 
 function saveRecording() {
   if (!chunks.length) {
     alert("No recording available to save.");
@@ -294,7 +303,7 @@ function saveRecording() {
   showRecordingPopup("💾 Recording saved");
 }
 
-// --- Cleanup ---
+// Cleanup 
 function cleanup() {
   [displayStream, micStream].forEach(s => s?.getTracks().forEach(t => t.stop()));
   displayStream = micStream = null;
@@ -302,13 +311,13 @@ function cleanup() {
   ctx = null;
 }
 
-// --- Popup notification ---
+// Popup notification 
 function showRecordingPopup(message) {
   const popup = document.createElement("div");
   popup.innerText = message;
   Object.assign(popup.style, {
     position: "fixed",
-    top: recordingPopupEl ? "70px" : "20px",
+    top: recordingPopupEl ? `${recordingPopupEl.offsetHeight + 30}px` : "20px",
     right: "20px",
     background: "#202124",
     color: "white",
@@ -331,3 +340,4 @@ function showRecordingPopup(message) {
   }, 5000);
 
 }
+
