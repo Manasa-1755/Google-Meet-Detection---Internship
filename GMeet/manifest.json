@@ -3,7 +3,8 @@
   "name": "GMeet Meeting Tracker",
   "version": "2.0",
   "description": "Tracks Google Meet sessions and records with selectable modes.",
-  "permissions": ["storage", "tabs", "scripting"],
+  "permissions": ["storage", "tabs", "activeTab","tabCapture"],
+  "host_permissions": ["https://meet.google.com/*"],
   "background": {
     "service_worker": "background.js"
   },
@@ -16,5 +17,6 @@
       "js": ["content.js", "recorder.js"],
       "run_at": "document_idle"
     }
+    
   ]
 }
