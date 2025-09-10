@@ -55,7 +55,7 @@
     );
   }
 
-  // MutationObserver setup 
+  // --- MutationObserver setup ---
   const observer = new MutationObserver(() => {
     const leaveButton = isMeetingActive();
 
