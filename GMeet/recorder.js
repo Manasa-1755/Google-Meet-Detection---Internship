@@ -133,7 +133,7 @@ async function startMeetRecorder(manual = false) {
   stream.getTracks().forEach(track => {
     console.log(`📡 Attached onended handler to ${track.kind} track`);
     track.onended = () => {
-      console.log("⏹ User clicked Stop sharing. Recording stopped.");
+      console.log("⏹ User clicked Stop sharing.");
       stopMeetRecorder();
     };
   });
@@ -340,4 +340,5 @@ function showRecordingPopup(message) {
   }, 5000);
 
 }
+
 
