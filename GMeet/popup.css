@@ -1,114 +1,148 @@
-/* Everything scoped inside #popupUI to avoid leaking into Meet */
-#popupUI {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  width: 260px;
-  padding: 14px;
-  background: rgba(28, 28, 28, 0.9);
-  color: #f5f5f5;
-  border-radius: 10px;
-  backdrop-filter: blur(10px) saturate(150%);
-  -webkit-backdrop-filter: blur(10px) saturate(150%);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
+/* Minimal Glassmorphic Meet Recorder UI */
 
-#popupUI #label {
-  font-size: 12px;
-  font-weight: 600;
-  margin-bottom: 6px;
-  display: block;
-  text-transform: uppercase;
-  letter-spacing: 0.7px;
-  color: #b0b0b0;
-}
-
-#popupUI .modes { 
-  display: flex; 
-  justify-content: space-between; 
-  margin: 10px 0 14px 0; 
-}
-
-#popupUI .toggle {
-  flex: 1;
-  margin: 2px;
-  padding: 8px;
-  border-radius: 6px;
-  cursor: pointer;
-  text-align: center;
-  user-select: none;
-  background: rgba(255, 255, 255, 0.05);
-  color: #ddd;
-  font-size: 13px;
-  font-weight: 500;
-  transition: background 0.2s ease;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+body {
+  margin: 0;
+  padding: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #1e1e2f, #2a2a40);
+  height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
+/* Main popup card */
+#popupUI {
+  width: 280px;
+  padding: 18px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f1f1f1;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+/* Label */
+#popupUI #label {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #c7c7c7;
+}
+
+/* Mode selector */
+#popupUI .modes {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+#popupUI .toggle {
+  flex: 1;
+  padding: 10px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #ddd;
+  transition: all 0.25s ease-in-out;
+}
+
 #popupUI .toggle:hover {
   background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-2px);
 }
 
 #popupUI .toggle.active {
-  background: #1a73e8;
+  background: #3a82f7;
+  border-color: #3a82f7;
   color: #fff;
-  border-color: #1a73e8;
   font-weight: 600;
+  box-shadow: 0 3px 10px rgba(58, 130, 247, 0.4);
 }
 
-#popupUI button {
-  margin: 5px 0;
-  width: 100%;
-  padding: 9px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  transition: background 0.2s ease, opacity 0.2s ease;
-}
-
-#popupUI button:hover {
-  opacity: 0.9;
-}
-
-#popupUI #start { 
-  background: #1a73e8; 
-  color: #fff; 
-}
-
-#popupUI #stop { 
-  background: #d93025; 
-  color: #fff; 
-}
-
-#popupUI #save {
-  background: #34a853; 
-  color: #fff;
-}
-
+/* Auto record switch */
 #popupUI #autoToggleWrapper {
   margin: 12px 0;
   font-size: 13px;
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  gap: 8px;
   color: #ccc;
 }
 
 #popupUI #autoToggle {
   transform: scale(1.1);
   cursor: pointer;
-  accent-color: #1a73e8;
+  accent-color: #3a82f7;
 }
 
-#popupUI #status { 
-  margin-top: 10px; 
-  font-size: 12px; 
-  color: #aaa;
-  font-weight: 500; 
+/* Buttons */
+#popupUI button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 8px;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#popupUI #start {
+  background: #3a82f7;
+  color: #fff;
+}
+
+#popupUI #stop {
+  background: #e84545;
+  color: #fff;
+}
+
+#popupUI #save {
+  background: #34c759;
+  color: #fff;
+}
+
+#popupUI button:hover {
+  transform: scale(1.05);
+  opacity: 0.95;
+}
+
+/* Status area */
+#popupUI #status {
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 8px;
+  border-radius: 8px;
   text-align: center;
   letter-spacing: 0.3px;
+  transition: background 0.3s ease;
+}
+
+#popupUI #status.neutral {
+  background: rgba(255, 255, 255, 0.08);
+  color: #bbb;
+}
+
+#popupUI #status.active {
+  background: rgba(52, 199, 89, 0.25);
+  color: #a9f5c8;
+}
+
+#popupUI #status.inactive {
+  background: rgba(232, 69, 69, 0.25);
+  color: #f5b1b1;
 }
