@@ -1,148 +1,149 @@
-/* Minimal Glassmorphic Meet Recorder UI */
-
 body {
   margin: 0;
   padding: 0;
   font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, #1e1e2f, #2a2a40);
+  background: linear-gradient(135deg, #6a11cb, #2575fc);
   height: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
 }
 
-/* Main popup card */
-#popupUI {
-  width: 280px;
-  padding: 18px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #f1f1f1;
+.popup-card {
+  width: 320px;
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  color: #fff;
   text-align: center;
   transition: all 0.3s ease;
 }
 
-/* Label */
-#popupUI #label {
-  font-size: 13px;
+.popup-card h2 {
+  margin-bottom: 15px;
+  font-size: 20px;
+  color: #fff;
   font-weight: 600;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: #c7c7c7;
+  letter-spacing: 0.5px;
 }
 
-/* Mode selector */
-#popupUI .modes {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 16px;
+.modes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 15px;
 }
 
-#popupUI .toggle {
-  flex: 1;
-  padding: 10px;
-  border-radius: 10px;
+.mode-tile {
+  position: relative;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #ddd;
+  border-radius: 12px;
+  padding: 12px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: bold;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   transition: all 0.25s ease-in-out;
+  color: #fff;
 }
 
-#popupUI .toggle:hover {
-  background: rgba(255, 255, 255, 0.12);
+.mode-tile:hover {
+  background: rgba(255, 255, 255, 0.25);
   transform: translateY(-2px);
 }
 
-#popupUI .toggle.active {
-  background: #3a82f7;
-  border-color: #3a82f7;
+.mode-tile input {
+  display: none;
+}
+
+.mode-tile input:checked + span {
   color: #fff;
-  font-weight: 600;
-  box-shadow: 0 3px 10px rgba(58, 130, 247, 0.4);
+  background: linear-gradient(135deg, #ff512f, #dd2476);
+  padding: 6px 12px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
-/* Auto record switch */
-#popupUI #autoToggleWrapper {
-  margin: 12px 0;
-  font-size: 13px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  color: #ccc;
-}
-
-#popupUI #autoToggle {
-  transform: scale(1.1);
-  cursor: pointer;
-  accent-color: #3a82f7;
-}
-
-/* Buttons */
-#popupUI button {
+.btn-primary {
   width: 100%;
   padding: 10px;
-  margin-top: 8px;
+  margin-top: 10px;
   border: none;
-  border-radius: 10px;
-  font-size: 14px;
-  font-weight: 600;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: bold;
   cursor: pointer;
-  transition: all 0.2s ease;
+  background: linear-gradient(135deg, #43e97b, #38f9d7);
+  color: #222;
+  transition: transform 0.2s ease;
 }
 
-#popupUI #start {
-  background: #3a82f7;
-  color: #fff;
-}
-
-#popupUI #stop {
-  background: #e84545;
-  color: #fff;
-}
-
-#popupUI #save {
-  background: #34c759;
-  color: #fff;
-}
-
-#popupUI button:hover {
+.btn-primary:hover {
   transform: scale(1.05);
-  opacity: 0.95;
 }
 
-/* Status area */
-#popupUI #status {
+.status {
   margin-top: 12px;
-  font-size: 12px;
-  font-weight: 500;
-  padding: 8px;
-  border-radius: 8px;
+  font-size: 13px;
+  padding: 10px;
+  border-radius: 10px;
   text-align: center;
-  letter-spacing: 0.3px;
   transition: background 0.3s ease;
 }
 
-#popupUI #status.neutral {
-  background: rgba(255, 255, 255, 0.08);
-  color: #bbb;
+.status.neutral {
+  background: rgba(255, 255, 255, 0.15);
 }
 
-#popupUI #status.active {
-  background: rgba(52, 199, 89, 0.25);
-  color: #a9f5c8;
+.status.active {
+  background: rgba(67, 233, 123, 0.25);
 }
 
-#popupUI #status.inactive {
-  background: rgba(232, 69, 69, 0.25);
-  color: #f5b1b1;
+.status.inactive {
+  background: rgba(255, 82, 82, 0.25);
+}
+
+.manual {
+  display: none;
+  margin-top: 12px;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.btn-secondary {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  background: linear-gradient(135deg, #42a5f5, #478ed1);
+  color: white;
+  transition: transform 0.2s ease;
+}
+
+.btn-secondary:hover {
+  transform: scale(1.05);
+}
+
+.btn-danger {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  background: linear-gradient(135deg, #ff416c, #ff4b2b);
+  color: white;
+  transition: transform 0.2s ease;
+}
+
+.btn-danger:hover {
+  transform: scale(1.05);
 }

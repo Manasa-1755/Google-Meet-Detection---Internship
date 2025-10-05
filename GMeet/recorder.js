@@ -1,344 +1,207 @@
+/// recorder.js – runs in a dedicated tab for recording
+let mediaRecorder;
+let recordedChunks = [];
+let isRecording = false;
+let timerInterval;
+let recordingStartTime;
+let isAutoRecord = false;
 
-let displayStream, micStream, mediaRecorder, chunks = [];
-let ctx;
-let recordMode = "audio+video"; // default
-let recordingPopupEl = null;
-let recordingTimerInterval = null;
-let recordingStartTime = null;
-let autoRecord = false; // true = auto, false = manual
+console.log("🎬 GMeet Recorder tab loaded");
 
-// Helper: capture current tab 
-function captureTab(video = true, audio = false) {
-  return new Promise((resolve, reject) => {
-    chrome.tabCapture.capture({ video, audio }, stream => {
-      if (!stream) reject(chrome.runtime.lastError);
-      else resolve(stream);
-    });
-  });
-}
+// Listen for messages from popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log("📨 Recorder received:", message.action);
 
-// Load auto/manual preference 
-function initRecorder(){
-  chrome.storage.local.get("meetAutoRecord", ({ meetAutoRecord }) => {
-    autoRecord = meetAutoRecord ?? false;
-    console.log(`📌 Auto-record is ${autoRecord ? "enabled" : "disabled"}`);
-
-    // Only log, never start manually
-    if(isMeetActive()) {
-      console.log("📌 Meet detected on load.");
-      if(autoRecord){
-        console.log("📌 Auto-record enabled, starting recorder...");
-        startMeetRecorder();
-      } else {
-        console.log("📌 Manual mode: waiting for START click...");
-      }
-    }
-  });
-}
-
-// Initialize
-initRecorder();
-
-// Live "Recording + Timing" Popup
-function showRecordingTimerPopup() {
-  if (recordingPopupEl) return;
-
-  recordingStartTime = Date.now();
-
-  recordingPopupEl = document.createElement("div");
-  Object.assign(recordingPopupEl.style, {
-    position: "fixed",
-    top: "20px",
-    right: "20px",
-    background: "#202124",
-    color: "white",
-    padding: "12px 18px",
-    borderRadius: "8px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-    fontSize: "14px",
-    zIndex: "9999",
-    opacity: "0",
-    transition: "opacity 0.4s ease",
-    fontFamily: "monospace"
-  });
-
-  document.body.appendChild(recordingPopupEl);
-
-  requestAnimationFrame(() => recordingPopupEl.style.opacity = "1");
-
-  recordingTimerInterval = setInterval(() => {
-    const elapsed = Date.now() - recordingStartTime;
-    const h = String(Math.floor(elapsed / 3600000)).padStart(2, "0");
-    const m = String(Math.floor((elapsed % 3600000) / 60000)).padStart(2, "0");
-    const s = String(Math.floor((elapsed % 60000) / 1000)).padStart(2, "0");
-    recordingPopupEl.innerText = `🔴 Recording… ${h}:${m}:${s}`;
-  }, 1000);
-}
-
-// Stop & remove recording popup
-function hideRecordingTimerPopup() {
-  if (recordingTimerInterval) clearInterval(recordingTimerInterval);
-  recordingTimerInterval = null;
-
-  if (recordingPopupEl) {
-    recordingPopupEl.style.opacity = "0";
-    setTimeout(() => recordingPopupEl?.remove(), 400);
+  if (message.action === "startRecording") {
+    isAutoRecord = message.autoRecord || false;
+    startRecording(message.tabId);
+    sendResponse({ success: true });
   }
-  recordingPopupEl = null;
-}
 
-console.log(`🎥 Recorder initialized`);
-
-// Listen for popup commands
-chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg.command === "save") {
-    saveRecording();
-    sendResponse({ status: "Saved" });
-  } 
-  else if(msg.command === "start") {
-    startMeetRecorder(true); // pass manual=true
-    sendResponse({ status: "Started" });
-  } 
-  else if(msg.command === "stop") {
-    stopMeetRecorder();
-    sendResponse({ status: "Stopped" });
+  if (message.action === "stopRecording") {
+    stopRecording();
+    sendResponse({ success: true });
   }
+
   return true;
 });
 
-// Meet detection hook 
-function onMeetDetected() {
-  if (autoRecord) {
-    console.log("📌 Meet detected, auto-recording enabled. Starting recorder...");
-    startMeetRecorder();
-  } else {
-    console.log("📌 Meet detected, manual mode. Waiting for user START click.");
-  }
-}
+async function startRecording(tabId) {
+  console.log("🎬 Starting recording for tab:", tabId);
 
-// Start recording 
-async function startMeetRecorder(manual = false) {
-  if (!autoRecord && !manual) {
-    console.log("⚠️ Ignored auto start because manual mode is active.");
+  if (isRecording) {
+    console.log("⚠️ Already recording");
     return;
   }
-
-  if (mediaRecorder && mediaRecorder.state === "recording") {
-    console.warn("🎥 Already recording, ignoring duplicate start.");
-    return;
-  }
-
-  function attachStopSharingHandler(stream) {
-  if (!stream) return;
-  stream.getTracks().forEach(track => {
-    console.log(`📡 Attached onended handler to ${track.kind} track`);
-    track.onended = () => {
-      console.log("⏹ User clicked Stop sharing.");
-      stopMeetRecorder();
-    };
-  });
-}
-
 
   try {
-    recordMode = await new Promise(resolve => {
-      chrome.storage.local.get("meetRecordMode", ({ meetRecordMode }) =>
-        resolve(meetRecordMode || "audio+video")
-      );
+    document.getElementById("status").textContent = "🟡 Starting recording...";
+
+    // Capture the tab stream (video + audio)
+    const tabStream = await new Promise((resolve, reject) => {
+      chrome.tabCapture.capture({
+        audio: true,
+        video: true,
+        audioConstraints: {
+          mandatory: {
+            chromeMediaSource: 'tab',
+            chromeMediaSourceId: tabId,
+            echoCancellation: true
+          }
+        },
+        videoConstraints: {
+          mandatory: {
+            chromeMediaSource: 'tab',
+            chromeMediaSourceId: tabId,
+            minWidth: 1280,
+            minHeight: 720,
+            maxWidth: 1920,
+            maxHeight: 1080,
+            maxFrameRate: 30
+          }
+        }
+      }, (stream) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else if (!stream) reject(new Error("No tab stream returned"));
+        else resolve(stream);
+      });
     });
 
-    recordMode = recordMode.toLowerCase();
+    console.log("✅ Tab stream captured:", tabStream.getTracks().length);
 
-    if (mediaRecorder && mediaRecorder.state === "recording") {
-      console.warn("🎥 Already recording");
-      return;
+    let finalStream = tabStream;
+
+    // Try to add mic audio
+    try {
+      const micStream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        video: false
+      });
+
+      const audioContext = new AudioContext();
+      const destination = audioContext.createMediaStreamDestination();
+      const tabSource = audioContext.createMediaStreamSource(new MediaStream(tabStream.getAudioTracks()));
+      const micSource = audioContext.createMediaStreamSource(micStream);
+      tabSource.connect(destination);
+      micSource.connect(destination);
+
+      finalStream = new MediaStream([...tabStream.getVideoTracks(), ...destination.stream.getAudioTracks()]);
+      console.log("✅ Audio mixed successfully");
+    } catch (micError) {
+      console.warn("⚠️ Microphone unavailable, using tab audio only:", micError);
+      finalStream = tabStream;
     }
 
-    console.log(`🎥 Starting recording in mode: ${recordMode.toUpperCase()}`);
+    // Choose MIME type
+    const mimeTypes = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm;codecs=h264,opus','video/webm'];
+    let supportedType = mimeTypes.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
 
-    chunks = [];
-    let finalStreamTracks = [];
+    mediaRecorder = new MediaRecorder(finalStream, {
+      mimeType: supportedType,
+      videoBitsPerSecond: 2500000,
+      audioBitsPerSecond: 128000
+    });
 
-    // Video only
-    if (recordMode === "video") {
-      try {
-        displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { frameRate: 30 },
-          audio: false
-        });
+    recordedChunks = [];
+    isRecording = true;
+    recordingStartTime = Date.now();
 
-        attachStopSharingHandler(displayStream);
+    mediaRecorder.ondataavailable = e => {
+      if (e.data.size > 0) recordedChunks.push(e.data);
+    };
 
-        finalStreamTracks.push(...displayStream.getVideoTracks());
-      } catch (error) {
-        console.warn("User cancelled screen sharing");
-        return;
-      }
-    }
+    mediaRecorder.onstop = () => {
+      stopTimer();
+      downloadRecording();
+      cleanup();
+    };
 
-    // Audio only 
-    if (recordMode === "audio") {
-      try {
-        micStream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true }
-        });
-
-        finalStreamTracks.push(...micStream.getAudioTracks());
-      } catch (error) {
-        console.warn("User denied microphone access");
-        return;
-      }
-    }
-
-    // Both 
-    if (recordMode === "audio+video") {
-      try {
-        displayStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { frameRate: 30 },
-          audio: true
-        });
-
-        attachStopSharingHandler(displayStream);
-      } catch (err) {
-        console.warn("❌ User cancelled screen share (audio+video).");
-        return;
-      }
-
-      try {
-        micStream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true }
-        });
-      } catch (error) {
-        console.warn("⚠️ User denied microphone access (audio+video).");
-        return;
-      }
-
-      ctx = new (window.AudioContext || window.webkitAudioContext)();
-      if (ctx.state === "suspended") await ctx.resume();
-      const dest = ctx.createMediaStreamDestination();
-
-      if (displayStream.getAudioTracks().length) {
-        const tabSource = ctx.createMediaStreamSource(
-          new MediaStream([displayStream.getAudioTracks()[0]])
-        );
-        tabSource.connect(dest);
-      }
-
-
-
-      if (micStream.getAudioTracks().length) {
-        const micSource = ctx.createMediaStreamSource(
-          new MediaStream([micStream.getAudioTracks()[0]])
-        );
-        micSource.connect(dest);
-      }
-
-      finalStreamTracks.push(...displayStream.getVideoTracks());
-      finalStreamTracks.push(...dest.stream.getAudioTracks());
-
-      if (!finalStreamTracks.length) {
-        console.warn("⚠️ No media tracks available, recording aborted.");
-        return;
-      }
-    }
-
-    const finalStream = new MediaStream(finalStreamTracks);
-    const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9,opus")
-      ? "video/webm;codecs=vp9,opus"
-      : "video/webm";
-
-    mediaRecorder = new MediaRecorder(finalStream, { mimeType, bitsPerSecond: 3_000_000 });
-    mediaRecorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+    mediaRecorder.onerror = e => {
+      console.error("❌ MediaRecorder error:", e);
+      document.getElementById("status").textContent = "❌ Recording error";
+      cleanup();
+    };
 
     mediaRecorder.start(1000);
+    document.getElementById("status").textContent = isAutoRecord ? "🟢 Auto Recording..." : "🟢 Recording...";
+    startTimer();
 
-    if(mediaRecorder && mediaRecorder.state === "recording"){
-      console.log(`✅ Recording started (${recordMode.toUpperCase()})`);
-      showRecordingTimerPopup();
-      showRecordingPopup(`🎥 Recording started (${recordMode.toUpperCase()})`);
-    } else{
-      console.warn("Recording did not start properly.");
-    }
-
+    await chrome.storage.local.set({ isRecording: true, recordingStartTime });
+    chrome.runtime.sendMessage({ action: "recordingStarted" });
+    console.log("✅ Recording started!");
   } catch (err) {
-    console.error("Recording start failed:", err);
-    cleanup();
+    console.error("❌ Recording start failed:", err);
+    document.getElementById("status").textContent = "❌ Recording failed: " + err.message;
   }
 }
 
-// Stop recording 
-async function stopMeetRecorder() {
-  hideRecordingTimerPopup();
-
-  if (!mediaRecorder || mediaRecorder.state !== "recording") {
-    console.warn("No active recording to stop.");
-    return;
-  }
-
-  mediaRecorder.onstop = () => cleanup();
-  mediaRecorder.stop();
-  console.log(`⏹ Recording stopped (${recordMode.toUpperCase()})`);
-  if(chunks.length){
-    showRecordingPopup(`⏹ Recording stopped (${recordMode.toUpperCase()})`);
-  }
+function stopRecording() {
+  if (mediaRecorder && isRecording) mediaRecorder.stop();
+  else console.log("⚠️ No active recording");
 }
 
-// Save manually 
-function saveRecording() {
-  if (!chunks.length) {
-    alert("No recording available to save.");
-    console.log("⚠️ No recording data to save.");
+function startTimer() {
+  let seconds = 0;
+  const timerEl = document.getElementById("timer");
+  if (timerInterval) clearInterval(timerInterval);
+
+  timerInterval = setInterval(() => {
+    seconds++;
+    const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
+    const secs = String(seconds % 60).padStart(2, "0");
+    const timeStr = `${mins}:${secs}`;
+    timerEl.textContent = timeStr;
+    chrome.storage.local.set({ recordingTime: timeStr });
+    chrome.runtime.sendMessage({ action: "timerUpdate", time: timeStr });
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = null;
+}
+
+function downloadRecording() {
+  if (!recordedChunks.length) {
+    document.getElementById("status").textContent = "❌ No recording data";
     return;
   }
-  const blob = new Blob(chunks, { type: mediaRecorder?.mimeType || "video/webm" });
+
+  const blob = new Blob(recordedChunks, { type: 'video/webm' });
   const url = URL.createObjectURL(blob);
-  const ts = new Date().toISOString().replace(/[:.]/g, "-");
-  const a = document.createElement("a");
+  const timestamp = new Date().toISOString().replace(/[:.]/g,'-').replace('T','_').split('Z')[0];
+  const filename = `gmeet-recording-${timestamp}.webm`;
+
+  chrome.downloads.download({ url, filename, saveAs: true }, downloadId => {
+    if (chrome.runtime.lastError) fallbackDownload(blob, filename);
+    else document.getElementById("status").textContent = "✅ Recording saved!";
+  });
+}
+
+function fallbackDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
   a.href = url;
-  a.download = `meet-recording-${ts}.webm`;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
-  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
-  console.log("💾 Recording saved.");
-  showRecordingPopup("💾 Recording saved");
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  document.getElementById("status").textContent = "✅ Recording saved!";
 }
 
-// Cleanup 
 function cleanup() {
-  [displayStream, micStream].forEach(s => s?.getTracks().forEach(t => t.stop()));
-  displayStream = micStream = null;
-  if (ctx && ctx.state !== "closed") ctx.close();
-  ctx = null;
+  isRecording = false;
+  stopTimer();
+
+  if (mediaRecorder?.stream) mediaRecorder.stream.getTracks().forEach(t => t.stop());
+  recordedChunks = [];
+  chrome.storage.local.remove(['isRecording','recordingTime','recordingStartTime']);
+  chrome.runtime.sendMessage({ action: "recordingStopped" });
+  document.getElementById("status").textContent = "✅ Recording completed";
+
+  if (isAutoRecord) setTimeout(() => window.close(), 5000);
 }
 
-// Popup notification 
-function showRecordingPopup(message) {
-  const popup = document.createElement("div");
-  popup.innerText = message;
-  Object.assign(popup.style, {
-    position: "fixed",
-    top: recordingPopupEl ? `${recordingPopupEl.offsetHeight + 30}px` : "20px",
-    right: "20px",
-    background: "#202124",
-    color: "white",
-    padding: "12px 18px",
-    borderRadius: "8px",
-    boxShadow: "0 4px 12px rgba(0,0,0,0.3)",
-    fontSize: "14px",
-    zIndex: "9999",
-    opacity: "0",
-    transition: "opacity 0.4s ease"
-  });
-
-  document.body.appendChild(popup);
-
-  requestAnimationFrame(() => popup.style.opacity = "1");
-
-  setTimeout(() => {
-    popup.style.opacity = "0";
-    setTimeout(() => popup.remove(), 400);
-  }, 5000);
-
-}
-
-
+// Keep tab alive for auto-recording
+setInterval(() => { if (isRecording) console.log("💓 Recorder alive"); }, 30000);
