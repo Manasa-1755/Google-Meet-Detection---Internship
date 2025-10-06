@@ -1,3 +1,4 @@
+/*
 /// recorder.js – runs in a dedicated tab for recording
 let mediaRecorder;
 let recordedChunks = [];
@@ -5,6 +6,7 @@ let isRecording = false;
 let timerInterval;
 let recordingStartTime;
 let isAutoRecord = false;
+let originalAudioContext = null;
 
 console.log("🎬 GMeet Recorder tab loaded");
 
@@ -37,7 +39,10 @@ async function startRecording(tabId) {
   try {
     document.getElementById("status").textContent = "🟡 Starting recording...";
 
-    // Capture the tab stream (video + audio)
+    // First, ensure the Meet tab continues to play audio normally
+    // We'll capture the tab but create a duplicate audio stream
+    
+    // Capture the tab stream (video + Meet audio)
     const tabStream = await new Promise((resolve, reject) => {
       chrome.tabCapture.capture({
         audio: true,
@@ -46,7 +51,11 @@ async function startRecording(tabId) {
           mandatory: {
             chromeMediaSource: 'tab',
             chromeMediaSourceId: tabId,
-            echoCancellation: true
+            // Don't suppress audio processing - let Meet handle it
+            googEchoCancellation: true,
+            googAutoGainControl: true,
+            googNoiseSuppression: true,
+            googHighpassFilter: true
           }
         },
         videoConstraints: {
@@ -67,34 +76,85 @@ async function startRecording(tabId) {
       });
     });
 
-    console.log("✅ Tab stream captured:", tabStream.getTracks().length);
+    console.log("✅ Tab stream captured. Audio tracks:", tabStream.getAudioTracks().length, 
+                "Video tracks:", tabStream.getVideoTracks().length);
 
-    let finalStream = tabStream;
-
-    // Try to add mic audio
+    // Create duplicate audio streams - one for recording, one for playback
+    const audioContext = new AudioContext();
+    const destination = audioContext.createMediaStreamDestination();
+    
+    // Source from the captured tab audio
+    const audioSource = audioContext.createMediaStreamSource(
+      new MediaStream(tabStream.getAudioTracks())
+    );
+    
+    // Split the audio: one branch goes to recording, one goes to speakers
+    const splitter = audioContext.createChannelSplitter(2);
+    const merger = audioContext.createChannelMerger(2);
+    
+    audioSource.connect(splitter);
+    
+    // Branch 1: Send to speakers (so you can hear Meet audio)
+    const gainNode = audioContext.createGain();
+    gainNode.gain.value = 1.0; // Full volume for playback
+    splitter.connect(gainNode, 0);
+    gainNode.connect(audioContext.destination);
+    
+    // Branch 2: Send to recording (mixed with microphone)
+    splitter.connect(merger, 1, 0);
+    
+    let finalAudioStream = destination.stream;
+    
+    // Try to add microphone audio to the recording
     try {
       const micStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true
+        },
         video: false
       });
 
-      const audioContext = new AudioContext();
-      const destination = audioContext.createMediaStreamDestination();
-      const tabSource = audioContext.createMediaStreamSource(new MediaStream(tabStream.getAudioTracks()));
-      const micSource = audioContext.createMediaStreamSource(micStream);
-      tabSource.connect(destination);
-      micSource.connect(destination);
+      console.log("✅ Microphone stream captured");
 
-      finalStream = new MediaStream([...tabStream.getVideoTracks(), ...destination.stream.getAudioTracks()]);
-      console.log("✅ Audio mixed successfully");
+      if (micStream.getAudioTracks().length > 0) {
+        const micSource = audioContext.createMediaStreamSource(micStream);
+        // Mix microphone with the Meet audio for recording
+        micSource.connect(merger, 0, 1);
+        console.log("✅ Microphone audio mixed with Meet audio for recording");
+      }
+      
     } catch (micError) {
-      console.warn("⚠️ Microphone unavailable, using tab audio only:", micError);
+      console.warn("⚠️ Microphone unavailable, recording Meet audio only:", micError);
+    }
+    
+    // Connect the merged audio to destination for recording
+    merger.connect(destination);
+    
+    // Create final stream for recording: video + mixed audio
+    const videoTrack = tabStream.getVideoTracks()[0];
+    const audioTrack = destination.stream.getAudioTracks()[0];
+    
+    let finalStream;
+    if (videoTrack && audioTrack) {
+      finalStream = new MediaStream([videoTrack, audioTrack]);
+      console.log("✅ Final recording stream created with video + mixed audio");
+    } else {
+      console.warn("⚠️ Using original tab stream as fallback");
       finalStream = tabStream;
     }
 
     // Choose MIME type
-    const mimeTypes = ['video/webm;codecs=vp9,opus','video/webm;codecs=vp8,opus','video/webm;codecs=h264,opus','video/webm'];
+    const mimeTypes = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus', 
+      'video/webm;codecs=h264,opus',
+      'video/webm'
+    ];
     let supportedType = mimeTypes.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
+
+    console.log("🎥 Using MIME type:", supportedType);
 
     mediaRecorder = new MediaRecorder(finalStream, {
       mimeType: supportedType,
@@ -105,12 +165,17 @@ async function startRecording(tabId) {
     recordedChunks = [];
     isRecording = true;
     recordingStartTime = Date.now();
+    originalAudioContext = audioContext;
 
     mediaRecorder.ondataavailable = e => {
-      if (e.data.size > 0) recordedChunks.push(e.data);
+      if (e.data.size > 0) {
+        recordedChunks.push(e.data);
+        console.log("📦 Data chunk:", e.data.size, "bytes");
+      }
     };
 
     mediaRecorder.onstop = () => {
+      console.log("🛑 Recording stopped, total chunks:", recordedChunks.length);
       stopTimer();
       downloadRecording();
       cleanup();
@@ -128,7 +193,8 @@ async function startRecording(tabId) {
 
     await chrome.storage.local.set({ isRecording: true, recordingStartTime });
     chrome.runtime.sendMessage({ action: "recordingStarted" });
-    console.log("✅ Recording started!");
+    console.log("✅ Recording started! Meet audio should still be audible in the original tab");
+
   } catch (err) {
     console.error("❌ Recording start failed:", err);
     document.getElementById("status").textContent = "❌ Recording failed: " + err.message;
@@ -136,8 +202,12 @@ async function startRecording(tabId) {
 }
 
 function stopRecording() {
-  if (mediaRecorder && isRecording) mediaRecorder.stop();
-  else console.log("⚠️ No active recording");
+  if (mediaRecorder && isRecording) {
+    console.log("🛑 Stopping recording...");
+    mediaRecorder.stop();
+  } else {
+    console.log("⚠️ No active recording to stop");
+  }
 }
 
 function startTimer() {
@@ -163,18 +233,26 @@ function stopTimer() {
 
 function downloadRecording() {
   if (!recordedChunks.length) {
+    console.error("❌ No recording data available");
     document.getElementById("status").textContent = "❌ No recording data";
     return;
   }
+
+  console.log("💾 Preparing download, total data:", recordedChunks.reduce((acc, chunk) => acc + chunk.size, 0), "bytes");
 
   const blob = new Blob(recordedChunks, { type: 'video/webm' });
   const url = URL.createObjectURL(blob);
   const timestamp = new Date().toISOString().replace(/[:.]/g,'-').replace('T','_').split('Z')[0];
   const filename = `gmeet-recording-${timestamp}.webm`;
 
-  chrome.downloads.download({ url, filename, saveAs: true }, downloadId => {
-    if (chrome.runtime.lastError) fallbackDownload(blob, filename);
-    else document.getElementById("status").textContent = "✅ Recording saved!";
+  chrome.downloads.download({ url, filename, saveAs: true }, (downloadId) => {
+    if (chrome.runtime.lastError) {
+      console.warn("⚠️ Chrome download failed, using fallback:", chrome.runtime.lastError);
+      fallbackDownload(blob, filename);
+    } else {
+      console.log("✅ Download started with ID:", downloadId);
+      document.getElementById("status").textContent = "✅ Recording saved!";
+    }
   });
 }
 
@@ -191,17 +269,343 @@ function fallbackDownload(blob, filename) {
 }
 
 function cleanup() {
+  console.log("🧹 Cleaning up recording resources");
   isRecording = false;
   stopTimer();
 
-  if (mediaRecorder?.stream) mediaRecorder.stream.getTracks().forEach(t => t.stop());
+  // Close audio context to stop audio playback
+  if (originalAudioContext) {
+    originalAudioContext.close();
+    originalAudioContext = null;
+  }
+
+  if (mediaRecorder?.stream) {
+    mediaRecorder.stream.getTracks().forEach(track => {
+      track.stop();
+      console.log("🔴 Stopped track:", track.kind);
+    });
+  }
+  
   recordedChunks = [];
   chrome.storage.local.remove(['isRecording','recordingTime','recordingStartTime']);
   chrome.runtime.sendMessage({ action: "recordingStopped" });
   document.getElementById("status").textContent = "✅ Recording completed";
 
-  if (isAutoRecord) setTimeout(() => window.close(), 5000);
+  if (isAutoRecord) {
+    console.log("🤖 Auto-record mode - closing tab in 3 seconds");
+    setTimeout(() => window.close(), 3000);
+  }
 }
 
 // Keep tab alive for auto-recording
-setInterval(() => { if (isRecording) console.log("💓 Recorder alive"); }, 30000);
+setInterval(() => { 
+  if (isRecording) console.log("💓 Recorder alive -", document.getElementById("timer").textContent); 
+}, 30000);
+*/
+
+
+/// recorder.js – runs in a dedicated tab for recording
+let mediaRecorder;
+let recordedChunks = [];
+let isRecording = false;
+let timerInterval;
+let recordingStartTime;
+let isAutoRecord = false;
+let originalAudioContext = null;
+
+console.log("🎬 GMeet Recorder tab loaded");
+
+// Listen for messages from popup
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  console.log("📨 Recorder received:", message.action);
+
+  if (message.action === "startRecording") {
+    isAutoRecord = message.autoRecord || false;
+    startRecording(message.tabId);
+    sendResponse({ success: true });
+  }
+
+  if (message.action === "stopRecording") {
+    stopRecording();
+    sendResponse({ success: true });
+  }
+
+  return true;
+});
+
+async function startRecording(tabId) {
+  console.log("🎬 Starting recording for tab:", tabId);
+
+  if (isRecording) {
+    console.log("⚠️ Already recording");
+    return;
+  }
+
+  try {
+    document.getElementById("status").textContent = "🟡 Starting recording...";
+
+    // Capture the tab stream (video + Meet audio)
+    const tabStream = await new Promise((resolve, reject) => {
+      chrome.tabCapture.capture({
+        audio: true,
+        video: true,
+        audioConstraints: {
+          mandatory: {
+            chromeMediaSource: 'tab',
+            chromeMediaSourceId: tabId,
+          }
+        },
+        videoConstraints: {
+          mandatory: {
+            chromeMediaSource: 'tab',
+            chromeMediaSourceId: tabId,
+            minWidth: 1280,
+            minHeight: 720,
+            maxWidth: 1920,
+            maxHeight: 1080,
+            maxFrameRate: 30
+          }
+        }
+      }, (stream) => {
+        if (chrome.runtime.lastError) reject(new Error(chrome.runtime.lastError.message));
+        else if (!stream) reject(new Error("No tab stream returned"));
+        else resolve(stream);
+      });
+    });
+
+    console.log("✅ Tab stream captured. Audio tracks:", tabStream.getAudioTracks().length, 
+                "Video tracks:", tabStream.getVideoTracks().length);
+
+    // Create audio context for mixing
+    const audioContext = new AudioContext();
+    const destination = audioContext.createMediaStreamDestination();
+    
+    // Get Meet audio from tab stream
+    const meetAudioSource = audioContext.createMediaStreamSource(
+      new MediaStream(tabStream.getAudioTracks())
+    );
+    
+    let micStream = null;
+    let micSource = null;
+    
+    // Try to capture microphone with proper error handling
+    try {
+      console.log("🎤 Requesting microphone access...");
+      micStream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+          channelCount: 1
+        },
+        video: false
+      });
+
+      console.log("✅ Microphone access granted. Tracks:", micStream.getAudioTracks().length);
+      
+      if (micStream.getAudioTracks().length > 0) {
+        micSource = audioContext.createMediaStreamSource(micStream);
+        console.log("✅ Microphone source created");
+      } else {
+        console.warn("⚠️ Microphone stream has no audio tracks");
+      }
+      
+    } catch (micError) {
+      console.error("❌ Microphone access denied:", micError);
+      // Continue without microphone
+    }
+
+    // Connect Meet audio to destination
+    meetAudioSource.connect(destination);
+    console.log("✅ Meet audio connected to recording");
+    
+    // Connect microphone to destination if available
+    if (micSource) {
+      micSource.connect(destination);
+      console.log("✅ Microphone audio connected to recording");
+    } else {
+      console.log("ℹ️ Recording without microphone - Meet audio only");
+    }
+
+    // Create final stream: video + mixed audio
+    const videoTrack = tabStream.getVideoTracks()[0];
+    const mixedAudioTrack = destination.stream.getAudioTracks()[0];
+    
+    if (!videoTrack) {
+      throw new Error("No video track available from tab capture");
+    }
+    
+    if (!mixedAudioTrack) {
+      throw new Error("No audio track available after mixing");
+    }
+
+    const finalStream = new MediaStream([videoTrack, mixedAudioTrack]);
+    console.log("✅ Final recording stream created");
+
+    // Choose MIME type
+    const mimeTypes = [
+      'video/webm;codecs=vp9,opus',
+      'video/webm;codecs=vp8,opus', 
+      'video/webm;codecs=h264,opus',
+      'video/webm'
+    ];
+    let supportedType = mimeTypes.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
+
+    console.log("🎥 Using MIME type:", supportedType);
+
+    mediaRecorder = new MediaRecorder(finalStream, {
+      mimeType: supportedType,
+      videoBitsPerSecond: 2500000,
+      audioBitsPerSecond: 128000
+    });
+
+    recordedChunks = [];
+    isRecording = true;
+    recordingStartTime = Date.now();
+    originalAudioContext = audioContext;
+
+    mediaRecorder.ondataavailable = e => {
+      if (e.data.size > 0) {
+        recordedChunks.push(e.data);
+        console.log("📦 Data chunk:", e.data.size, "bytes");
+      }
+    };
+
+    mediaRecorder.onstop = () => {
+      console.log("🛑 Recording stopped, total chunks:", recordedChunks.length);
+      stopTimer();
+      downloadRecording();
+      cleanup();
+    };
+
+    mediaRecorder.onerror = e => {
+      console.error("❌ MediaRecorder error:", e);
+      document.getElementById("status").textContent = "❌ Recording error";
+      cleanup();
+    };
+
+    mediaRecorder.start(1000);
+    document.getElementById("status").textContent = isAutoRecord ? "🟢 Auto Recording..." : "🟢 Recording...";
+    startTimer();
+
+    await chrome.storage.local.set({ isRecording: true, recordingStartTime });
+    chrome.runtime.sendMessage({ action: "recordingStarted" });
+    
+    // Test audio levels
+    if (micSource) {
+      console.log("🎤 Microphone is ACTIVE and being recorded");
+      console.log("🔊 Recording: Meet Audio + Your Microphone");
+    } else {
+      console.log("🔊 Recording: Meet Audio Only (Microphone not available)");
+    }
+    
+    console.log("✅ Recording started successfully!");
+
+  } catch (err) {
+    console.error("❌ Recording start failed:", err);
+    document.getElementById("status").textContent = "❌ Recording failed: " + err.message;
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && isRecording) {
+    console.log("🛑 Stopping recording...");
+    mediaRecorder.stop();
+  } else {
+    console.log("⚠️ No active recording to stop");
+  }
+}
+
+function startTimer() {
+  let seconds = 0;
+  const timerEl = document.getElementById("timer");
+  if (timerInterval) clearInterval(timerInterval);
+
+  timerInterval = setInterval(() => {
+    seconds++;
+    const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
+    const secs = String(seconds % 60).padStart(2, "0");
+    const timeStr = `${mins}:${secs}`;
+    timerEl.textContent = timeStr;
+    chrome.storage.local.set({ recordingTime: timeStr });
+    chrome.runtime.sendMessage({ action: "timerUpdate", time: timeStr });
+  }, 1000);
+}
+
+function stopTimer() {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = null;
+}
+
+function downloadRecording() {
+  if (!recordedChunks.length) {
+    console.error("❌ No recording data available");
+    document.getElementById("status").textContent = "❌ No recording data";
+    return;
+  }
+
+  console.log("💾 Preparing download, total data:", recordedChunks.reduce((acc, chunk) => acc + chunk.size, 0), "bytes");
+
+  const blob = new Blob(recordedChunks, { type: 'video/webm' });
+  const url = URL.createObjectURL(blob);
+  const timestamp = new Date().toISOString().replace(/[:.]/g,'-').replace('T','_').split('Z')[0];
+  const filename = `gmeet-recording-${timestamp}.webm`;
+
+  chrome.downloads.download({ url, filename, saveAs: true }, (downloadId) => {
+    if (chrome.runtime.lastError) {
+      console.warn("⚠️ Chrome download failed, using fallback:", chrome.runtime.lastError);
+      fallbackDownload(blob, filename);
+    } else {
+      console.log("✅ Download started with ID:", downloadId);
+      document.getElementById("status").textContent = "✅ Recording saved!";
+    }
+  });
+}
+
+function fallbackDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  document.getElementById("status").textContent = "✅ Recording saved!";
+}
+
+function cleanup() {
+  console.log("🧹 Cleaning up recording resources");
+  isRecording = false;
+  stopTimer();
+
+  // Close audio context
+  if (originalAudioContext) {
+    originalAudioContext.close();
+    originalAudioContext = null;
+  }
+
+  if (mediaRecorder?.stream) {
+    mediaRecorder.stream.getTracks().forEach(track => {
+      track.stop();
+      console.log("🔴 Stopped track:", track.kind);
+    });
+  }
+  
+  recordedChunks = [];
+  chrome.storage.local.remove(['isRecording','recordingTime','recordingStartTime']);
+  chrome.runtime.sendMessage({ action: "recordingStopped" });
+  document.getElementById("status").textContent = "✅ Recording completed";
+
+  if (isAutoRecord) {
+    console.log("🤖 Auto-record mode - closing tab in 3 seconds");
+    setTimeout(() => window.close(), 3000);
+  }
+}
+
+// Keep tab alive for auto-recording
+setInterval(() => { 
+  if (isRecording) console.log("💓 Recorder alive -", document.getElementById("timer").textContent); 
+}, 30000);
+
+
