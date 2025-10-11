@@ -411,16 +411,63 @@ function cleanup() {
   chrome.storage.local.remove(['isRecording','recordingTime','recordingStartTime']);
   chrome.runtime.sendMessage({ action: "recordingStopped" });
   document.getElementById("status").textContent = "✅ Recording completed";
-
-  // Close tab for ALL recording types (manual + auto)
-  setTimeout(() => window.close(), 2000);
 }
 
 // Keep tab alive for auto-recording
 setInterval(() => { 
   if (isRecording) console.log("💓 Recorder alive -", document.getElementById("timer").textContent); 
 }, 30000);
+//--------------------Handle tab closure during recording
 
+// FIXED VERSION - Replace with this:
+window.addEventListener('beforeunload', (event) => {
+  if (isRecording && recordedChunks.length > 0) {
+    console.log("🚨 Recorder tab closing during recording");
+    
+    // Store recording data for potential download
+    const recordingData = {
+      timestamp: Date.now(),
+      chunkCount: recordedChunks.length
+    };
+    sessionStorage.setItem('pendingRecording', JSON.stringify(recordingData));
+    
+    // Show the Leave/Cancel dialog
+    event.preventDefault();
+    event.returnValue = '';
+    return '';
+  }
+});
+
+// This only fires when they actually LEAVE the page
+window.addEventListener('unload', () => {
+  const pendingRecording = sessionStorage.getItem('pendingRecording');
+  
+  if (pendingRecording && recordedChunks.length > 0) {
+    console.log("✅ User confirmed Leave - downloading recording");
+    
+    // Use chrome.downloads API which works in unload
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const timestamp = new Date().toISOString().replace(/[:.]/g,'-').replace('T','_').split('Z')[0];
+    const filename = `gmeet-recording-${timestamp}.webm`;
+    
+    chrome.downloads.download({ 
+      url: url, 
+      filename: filename, 
+      saveAs: true 
+    });
+    
+    // Clean up sessionStorage
+    sessionStorage.removeItem('pendingRecording');
+
+    // 🆕 USE STORAGE INSTEAD OF MESSAGING (more reliable during unload)
+    chrome.storage.local.set({ 
+      recordingStoppedByTabClose: true 
+    });
+    
+    // URL will be cleaned up when tab closes
+  }
+});
 
 /*
 //FINAL PART
@@ -1412,6 +1459,7 @@ setInterval(() => {
   if (isRecording) console.log("💓 Recorder alive -", document.getElementById("timer").textContent); 
 }, 30000);
 */
+
 
 
 
