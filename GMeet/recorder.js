@@ -321,10 +321,8 @@ function cleanup() {
   chrome.runtime.sendMessage({ action: "recordingStopped" });
   document.getElementById("status").textContent = "✅ Recording completed";
 
-  if (isAutoRecord) {
-    console.log("🤖 Auto-record mode - closing tab in 3 seconds");
-    setTimeout(() => window.close(), 3000);
-  }
+  // ADD THIS LINE - Close tab for ALL recording types (manual + auto)
+  setTimeout(() => window.close(), 2000);
 }
 
 // Keep tab alive for auto-recording
@@ -943,3 +941,4 @@ setInterval(() => {
   if (isRecording) console.log("💓 Recorder alive -", document.getElementById("timer").textContent); 
 }, 30000);
 */
+
