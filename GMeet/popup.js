@@ -238,7 +238,6 @@ function updateUIForRecording(recordingTime) {
   document.getElementById("timer").textContent = recordingTime;
   document.getElementById("status").textContent = "🟢 Recording in background...";
   document.getElementById("startBtn").textContent = "Recording...";
-  document.getElementById("warning").style.display = "block";
   document.getElementById("startBtn").style.backgroundColor = "#666";
   document.getElementById("stopBtn").style.backgroundColor = autoRecordEnabled ? "#666" : "#f44336";
 }
@@ -255,28 +254,37 @@ function updateUIForReady() {
   }
 
   document.getElementById("startBtn").textContent = "Start Recording";
-  document.getElementById("warning").style.display = activeTabId ? "block" : "none";
   document.getElementById("startBtn").style.backgroundColor = activeTabId ? "#4CAF50" : "#666";
   document.getElementById("stopBtn").style.backgroundColor = "#666";
 }
 
 // ------------------ AUTO RECORD PERMISSION ------------------
 async function checkAutoRecordPermission() {
-  const result = await chrome.storage.local.get(['autoRecordPermission']);
-  autoRecordEnabled = result.autoRecordPermission || false;
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['autoRecordPermission'], (result) => {
+      autoRecordEnabled = result.autoRecordPermission || false;
+      
+      console.log("🔄 DEBUG - Storage value:", result.autoRecordPermission);
+      console.log("🔄 DEBUG - autoRecordEnabled:", autoRecordEnabled);
+      
+      const toggle = document.getElementById('autoRecordToggle');
+      const label = document.getElementById('toggleLabel');
+      
+      console.log("🔄 DEBUG - Toggle element:", toggle);
+      console.log("🔄 DEBUG - Label element:", label);
+      
+      if (toggle) {
+        toggle.checked = autoRecordEnabled;
+        console.log("🔄 DEBUG - Toggle checked set to:", toggle.checked);
+      }
+      if (label) {
+        label.textContent = autoRecordEnabled ? 'ON' : 'OFF';
+        console.log("🔄 DEBUG - Label set to:", label.textContent);
+      }
 
-  document.getElementById('autoRecordToggle').checked = autoRecordEnabled;
-  document.getElementById('toggleLabel').textContent = autoRecordEnabled ? 'ON' : 'OFF';
-  document.getElementById('permissionText').textContent = autoRecordEnabled
-    ? 'Auto recording enabled ✅'
-    : 'Automatically record when joining meetings';
-
-  // Disable Stop button if auto mode
-  document.getElementById('stopBtn').disabled = autoRecordEnabled;
-  document.getElementById('stopBtn').style.backgroundColor = autoRecordEnabled ? "#666" : "#f44336";
-
-  console.log("🔐 Auto record permission:", autoRecordEnabled);
-
+      resolve(autoRecordEnabled);
+    });
+  });
 }
 
 document.getElementById('autoRecordToggle').addEventListener('change', async (e) => {
@@ -382,4 +390,5 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
       files: ["content.js"]
     });
   }
+
 });
