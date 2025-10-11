@@ -9,8 +9,51 @@ let recordingStartTime;
 let isAutoRecord = false;
 let originalAudioContext = null;
 let muteCheckInterval = null;
+let autoRecordEnabled = false;
 
 console.log("🎬 GMeet Recorder tab loaded");
+
+// Function to sync toggle state
+async function syncToggleState() {
+  return new Promise((resolve) => {
+    chrome.storage.local.get(['autoRecordPermission'], (result) => {
+      autoRecordEnabled = result.autoRecordPermission || false;
+      console.log("🔄 Recorder: Auto record permission:", autoRecordEnabled);
+      // Update UI in real time
+      updateToggleDisplay();
+      resolve(autoRecordEnabled);
+    });
+  });
+}
+
+// Function to update the toggle
+function updateToggleDisplay() {
+  const statusElement = document.getElementById("status");
+  const indicatorElement = document.getElementById("autoRecordIndicator");
+  
+  if (indicatorElement) {
+    indicatorElement.textContent = `Auto Record: ${autoRecordEnabled ? 'ON' : 'OFF'}`;
+    indicatorElement.className = `auto-record-indicator ${autoRecordEnabled ? 'auto-on' : 'auto-off'}`;
+  }
+  
+  if (statusElement) {
+    if (isRecording) {
+      statusElement.textContent = autoRecordEnabled ? "🟢 Auto Recording..." : "🟢 Recording...";
+    } else {
+      statusElement.textContent = autoRecordEnabled ? "✅ Auto Record Enabled" : "✅ Ready to record...";
+    }
+  }
+}
+
+// To listen for toggle state changes
+chrome.storage.onChanged.addListener((changes, namespace) => {
+  if (namespace === 'local' && changes.autoRecordPermission) {
+    autoRecordEnabled = changes.autoRecordPermission.newValue;
+    console.log("🔄 Recorder: Toggle state updated to:", autoRecordEnabled);
+    
+    updateToggleDisplay();
+  }
+});
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -32,6 +75,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 async function startRecording(tabId) {
   console.log("🎬 Starting recording for tab:", tabId);
+
+  // Sync toggle state at start
+  await syncToggleState();
 
   if (isRecording) {
     console.log("⚠️ Already recording");
@@ -210,7 +256,7 @@ async function startRecording(tabId) {
     };
 
     mediaRecorder.start(1000);
-    document.getElementById("status").textContent = isAutoRecord ? "🟢 Auto Recording..." : "🟢 Recording...";
+    updateToggleDisplay();
     startTimer();
 
     await chrome.storage.local.set({ isRecording: true, recordingStartTime });
@@ -321,7 +367,7 @@ function cleanup() {
   chrome.runtime.sendMessage({ action: "recordingStopped" });
   document.getElementById("status").textContent = "✅ Recording completed";
 
-  // ADD THIS LINE - Close tab for ALL recording types (manual + auto)
+  // Close tab for ALL recording types (manual + auto)
   setTimeout(() => window.close(), 2000);
 }
 
@@ -941,4 +987,5 @@ setInterval(() => {
   if (isRecording) console.log("💓 Recorder alive -", document.getElementById("timer").textContent); 
 }, 30000);
 */
+
 
