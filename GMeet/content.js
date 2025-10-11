@@ -186,45 +186,7 @@ function getCurrentMeetingDuration() {
     return "0m 0s";
 }
 
-// Create floating timer
-function showTimer() {
-  if (timerEl) return;
-  timerEl = document.createElement("div");
-  timerEl.innerText = "Recording: 00:00";
-  Object.assign(timerEl.style, {
-    position: "fixed",
-    top: "20px",
-    right: "20px",
-    background: "#202124",
-    color: "#fff",
-    padding: "10px 15px",
-    borderRadius: "8px",
-    fontSize: "14px",
-    zIndex: 9999
-  });
-  document.body.appendChild(timerEl);
 
-  recordStartTime = Date.now();
-  timerInterval = setInterval(updateTimer, 1000);
-}
-
-// Update timer display
-function updateTimer() {
-  if (!recordStartTime || !timerEl) return;
-  const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
-  const minutes = String(Math.floor(elapsed / 60)).padStart(2, "0");
-  const seconds = String(elapsed % 60).padStart(2, "0");
-  timerEl.innerText = `Recording: ${minutes}:${seconds}`;
-}
-
-// Hide/remove timer
-function hideTimer() {
-  if (timerEl) timerEl.remove();
-  timerEl = null;
-  if (timerInterval) clearInterval(timerInterval);
-  timerInterval = null;
-  recordStartTime = null;
-}
 
 // Check if meeting is active
 function isMeetingActive() {
@@ -297,7 +259,6 @@ function checkMeetingState() {
     if (recordingStarted) {
       stopAutoRecording();
     }
-    hideTimer();
   }
 
   lastLeaveButtonVisible = leaveVisible;
@@ -312,7 +273,6 @@ function startAutoRecording() {
   chrome.runtime.sendMessage({ action: "autoStartRecording" }, (response) => {
     if (response?.success) {
       console.log("✅ Auto recording started");
-      showTimer(); // 🆕 SHOW FLOATING TIMER
     } else {
       recordingStarted = false;
     }
@@ -398,3 +358,39 @@ setTimeout(async () => {
   setInterval(checkMeetingState, 2000); // fallback
   console.log("🔍 Meet Auto Recorder content script fully loaded");
 }, 1000);
+
+// Add to content.js - mute status detection
+function getMuteStatus() {
+  // Look for mute button in Google Meet
+  const muteButton = document.querySelector('[aria-label*="microphone"]') || 
+                     document.querySelector('[data-tooltip*="microphone"]') ||
+                     document.querySelector('[jscontroller*="microphone"]');
+  
+  if (muteButton) {
+    const ariaLabel = muteButton.getAttribute('aria-label') || '';
+    const isMuted = ariaLabel.includes('unmute') || ariaLabel.includes('Turn on');
+    return { isMuted: isMuted };
+  }
+  
+  // Fallback: check for mute icon
+  const muteIcon = document.querySelector('svg[aria-label*="microphone"]');
+  if (muteIcon) {
+    const ariaLabel = muteIcon.getAttribute('aria-label') || '';
+    const isMuted = ariaLabel.includes('unmute') || ariaLabel.includes('Turn on');
+    return { isMuted: isMuted };
+  }
+  
+  return { isMuted: true }; // Default to muted if can't detect
+}
+
+// Add this message listener to content.js
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // ... your existing message handlers ...
+  
+  if (message.action === "getMuteStatus") {
+    const status = getMuteStatus();
+    sendResponse(status);
+  }
+  
+  return true;
+});
