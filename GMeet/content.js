@@ -348,6 +348,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.action === "getMuteStatus") {
+    const status = getMuteStatus();
+    sendResponse(status);
+  }
+  
   return true;
 });
 
@@ -383,14 +388,5 @@ function getMuteStatus() {
   return { isMuted: true }; // Default to muted if can't detect
 }
 
-// Add this message listener to content.js
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  // ... your existing message handlers ...
-  
-  if (message.action === "getMuteStatus") {
-    const status = getMuteStatus();
-    sendResponse(status);
-  }
-  
-  return true;
-});
+
+
