@@ -1,3 +1,4 @@
+//WORKING CODE
 /// recorder.js – runs in a dedicated tab for recording
 let mediaRecorder;
 let recordedChunks = [];
@@ -8,6 +9,8 @@ let isAutoRecord = false;
 let originalAudioContext = null;
 let muteCheckInterval = null;
 let autoRecordEnabled = false;
+let shouldDownloadOnClose = false;
+
 
 console.log("🎬 GMeet Recorder tab loaded");
 
@@ -222,46 +225,46 @@ async function startRecording(tabId) {
 
     // Create final stream: video + mixed audio
     // Create final stream: video + mixed audio
-const videoTrack = tabStream.getVideoTracks()[0];
-const mixedAudioTrack = destination.stream.getAudioTracks()[0];
+    const videoTrack = tabStream.getVideoTracks()[0];
+    const mixedAudioTrack = destination.stream.getAudioTracks()[0];
 
-// 🆕 Check the ORIGINAL source tracks from tabStream for closure detection
-const sourceVideoTrack = tabStream.getVideoTracks()[0];
-const sourceAudioTrack = tabStream.getAudioTracks()[0];
+    // 🆕 Check the ORIGINAL source tracks from tabStream for closure detection
+  const sourceVideoTrack = tabStream.getVideoTracks()[0];
+  const sourceAudioTrack = tabStream.getAudioTracks()[0];
 
-if (sourceVideoTrack) {
-  sourceVideoTrack.onended = () => {
-    console.log("❌ Source video track ended - Meet tab closed");
-    stopRecording();
-  };
-}
+  if (sourceVideoTrack) {
+    sourceVideoTrack.onended = () => {
+      console.log("❌ Source video track ended - Meet tab closed");
+      stopRecording();
+    };
+  }
 
-if (sourceAudioTrack) {
-  sourceAudioTrack.onended = () => {
-    console.log("❌ Source audio track ended - Meet tab closed");
-    stopRecording();
-  };
-}
+  if (sourceAudioTrack) {
+    sourceAudioTrack.onended = () => {
+      console.log("❌ Source audio track ended - Meet tab closed");
+      stopRecording();
+    };
+  }
 
-// ✅ Now these variables are properly defined
-if (!videoTrack) {
-  throw new Error("No video track available from tab capture");
-}
+  // ✅ Now these variables are properly defined
+  if (!videoTrack) {
+    throw new Error("No video track available from tab capture");
+  }
 
-if (!mixedAudioTrack) {
-  throw new Error("No audio track available after mixing");
-}
+  if (!mixedAudioTrack) {
+    throw new Error("No audio track available after mixing");
+  }
 
-const finalStream = new MediaStream([videoTrack, mixedAudioTrack]);
-console.log("✅ Final recording stream created");
+  const finalStream = new MediaStream([videoTrack, mixedAudioTrack]);
+  console.log("✅ Final recording stream created");
 
-    // Choose MIME type
-    const mimeTypes = [
+  // Choose MIME type
+  const mimeTypes = [
       'video/webm;codecs=vp9,opus',
       'video/webm;codecs=vp8,opus', 
       'video/webm;codecs=h264,opus',
       'video/webm'
-    ];
+  ];
     let supportedType = mimeTypes.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
 
     console.log("🎥 Using MIME type:", supportedType);
@@ -360,12 +363,16 @@ function downloadRecording() {
   const timestamp = new Date().toISOString().replace(/[:.]/g,'-').replace('T','_').split('Z')[0];
   const filename = `gmeet-recording-${timestamp}.webm`;
 
+  // 🆕 AUTO DOWNLOAD FOR AUTO MODE, SAVE AS FOR MANUAL MODE
+  const saveAs = !isAutoRecord; // Show "Save As" only in manual mode
+
   chrome.downloads.download({ url, filename, saveAs: true }, (downloadId) => {
     if (chrome.runtime.lastError) {
       console.warn("⚠️ Chrome download failed, using fallback:", chrome.runtime.lastError);
       fallbackDownload(blob, filename);
     } else {
       console.log("✅ Download started with ID:", downloadId);
+      console.log("🎯 Mode:", isAutoRecord ? "Auto (direct download)" : "Manual (Save As dialog)");
       document.getElementById("status").textContent = "✅ Recording saved!";
     }
   });
@@ -373,12 +380,34 @@ function downloadRecording() {
 
 function fallbackDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
+  if(isAutoRecord) {
+    // Auto mode: direct download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    document.getElementById("status").textContent = "✅ Recording saved!";
+  } else {
+    // Manual mode: trigger Save As dialog
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    
+    // This will trigger the Save As dialog in manual mode
+    const event = new MouseEvent('click', {
+      view: window,
+      bubbles: true,
+      cancelable: true
+    });
+    a.dispatchEvent(event);
+    
+    document.body.removeChild(a);
+    console.log("✅ Manual mode: Save As dialog triggered");
+  }
   setTimeout(() => URL.revokeObjectURL(url), 60000);
   document.getElementById("status").textContent = "✅ Recording saved!";
 }
@@ -408,15 +437,25 @@ function cleanup() {
   }
   
   recordedChunks = [];
-  chrome.storage.local.remove(['isRecording','recordingTime','recordingStartTime']);
+  chrome.storage.local.remove(['isRecording','recordingTime','recordingStartTime','recordingStoppedByTabClose']);
   chrome.runtime.sendMessage({ action: "recordingStopped" });
   document.getElementById("status").textContent = "✅ Recording completed";
+
+  // 🆕 CLOSE TAB FOR BOTH MODES AFTER DOWNLOAD COMPLETES
+  console.log("🤖 Closing recorder tab in 3 seconds");
+  setTimeout(() => {
+    window.close();
+  }, 3000);
+
+  // Close tab for ALL recording types (manual + auto)
+  //setTimeout(() => window.close(), 2000);
 }
 
 // Keep tab alive for auto-recording
 setInterval(() => { 
   if (isRecording) console.log("💓 Recorder alive -", document.getElementById("timer").textContent); 
 }, 30000);
+
 //--------------------Handle tab closure during recording
 
 // FIXED VERSION - Replace with this:
@@ -445,25 +484,31 @@ window.addEventListener('unload', () => {
   if (pendingRecording && recordedChunks.length > 0) {
     console.log("✅ User confirmed Leave - downloading recording");
     
+    // 🆕 RESET UI STATE FIRST
+    chrome.storage.local.set({ 
+      recordingStoppedByTabClose: true,
+      isRecording: false 
+    });
+
+    // 🆕 SEND UI RESET MESSAGE
+    chrome.runtime.sendMessage({ action: "recordingStopped" });
+    
     // Use chrome.downloads API which works in unload
     const blob = new Blob(recordedChunks, { type: 'video/webm' });
     const url = URL.createObjectURL(blob);
     const timestamp = new Date().toISOString().replace(/[:.]/g,'-').replace('T','_').split('Z')[0];
     const filename = `gmeet-recording-${timestamp}.webm`;
+
+    const saveAs = !isAutoRecord; // Show "Save As" only in manual mode
     
     chrome.downloads.download({ 
       url: url, 
       filename: filename, 
-      saveAs: true 
+      saveAs: savAs 
     });
     
     // Clean up sessionStorage
     sessionStorage.removeItem('pendingRecording');
-
-    // 🆕 USE STORAGE INSTEAD OF MESSAGING (more reliable during unload)
-    chrome.storage.local.set({ 
-      recordingStoppedByTabClose: true 
-    });
     
     // URL will be cleaned up when tab closes
   }
@@ -1459,6 +1504,7 @@ setInterval(() => {
   if (isRecording) console.log("💓 Recorder alive -", document.getElementById("timer").textContent); 
 }, 30000);
 */
+
 
 
 
