@@ -178,6 +178,7 @@ setInterval(() => {
 
 */
 
+// WORKING CODE 
 let userPermissionGranted = false;
 let currentRecordingTab = null;
 
@@ -229,8 +230,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // Close recorder tab for auto mode
+  if (message.action === "closeRecorderTab") {
+    console.log("🛑 Closing recorder tab for auto mode");
+    closeAllRecorderTabs();
+    sendResponse({ success: true });
+  }
+
+  // Stop recording when meeting ends (both modes)
+  if (message.action === "stopRecordingOnMeetingEnd") {
+    console.log("🛑 Meeting ended - stopping recording");
+    stopAllRecordings();
+    sendResponse({ success: true });
+  }
+
   return true;
 });
+
+// Close all recorder tabs
+function closeAllRecorderTabs() {
+  chrome.tabs.query({ url: chrome.runtime.getURL("recorder.html") }, (tabs) => {
+    tabs.forEach(tab => {
+      // Just send stop message, recorder will close itself after download
+      chrome.tabs.sendMessage(tab.id, { action: "stopRecording" });
+      console.log("✅ Stop message sent to recorder tab");
+    });
+  });
+  currentRecordingTab = null;
+}
 
 // Notify all Meet tabs about permission change
 function notifyAllMeetTabs(enabled) {
@@ -262,7 +289,20 @@ function startRecordingForTab(tabId) {
 
 function stopAllRecordings() {
   chrome.tabs.query({ url: chrome.runtime.getURL("recorder.html") }, (tabs) => {
-    tabs.forEach(tab => chrome.tabs.sendMessage(tab.id, { action: "stopRecording" }));
+    if (tabs.length > 0) {
+      tabs.forEach(tab => {
+        // 🆕 SEND STOP MESSAGE TO RECORDER TAB
+        chrome.tabs.sendMessage(tab.id, { action: "stopRecording" }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.log("⚠️ Recorder tab not responding, might be already closed");
+          } else {
+            console.log("✅ Stop message sent to recorder tab");
+          }
+        });
+      });
+    } else {
+      console.log("⚠️ No recorder tabs found");
+    }
   });
   currentRecordingTab = null;
 }
@@ -274,3 +314,4 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 
 // Keep service worker alive
 setInterval(() => chrome.runtime.getPlatformInfo(() => {}), 20000);
+
