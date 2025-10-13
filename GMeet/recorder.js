@@ -144,16 +144,34 @@ async function startRecording(tabId) {
     console.log("✅ Tab stream captured. Audio tracks:", tabStream.getAudioTracks().length, 
                 "Video tracks:", tabStream.getVideoTracks().length);
 
-    // Create audio context for mixing
+    // Create audio context for mixing and playback
     const audioContext = new AudioContext();
-    const destination = audioContext.createMediaStreamDestination();
+    const recordingDestination = audioContext.createMediaStreamDestination();
+    const playbackDestination = audioContext.createMediaStreamDestination();
     
-    // Get Meet audio from tab stream (other participants)
+    // Get Meet audio from tab stream
     const meetAudioSource = audioContext.createMediaStreamSource(
       new MediaStream(tabStream.getAudioTracks())
     );
     
-    // Get microphone audio (your voice) but don't connect it yet
+    // 🆕 CRITICAL FIX: Split audio for recording AND playback
+    // Create a splitter to duplicate the audio
+    const splitter = audioContext.createChannelSplitter(2);
+    const recordingMerger = audioContext.createChannelMerger(2);
+    const playbackMerger = audioContext.createChannelMerger(2);
+    
+    meetAudioSource.connect(splitter);
+    
+    // 🎧 Branch 1: Send audio to playback (so you can hear participants)
+    splitter.connect(playbackMerger, 0, 0);
+    splitter.connect(playbackMerger, 1, 1);
+    playbackMerger.connect(audioContext.destination);
+    
+    // 🎤 Branch 2: Send audio to recording (mixed with microphone)
+    splitter.connect(recordingMerger, 0, 0);
+    splitter.connect(recordingMerger, 1, 1);
+    
+    // Get microphone audio for recording
     let micStream = null;
     let micSource = null;
     let micGainNode = null;
@@ -177,25 +195,29 @@ async function startRecording(tabId) {
       
       // Start with microphone muted (gain = 0)
       micGainNode.gain.value = 0;
-      micGainNode.connect(destination);
-      console.log("✅ Microphone connected but MUTED (gain = 0)");
+      
+      // Connect microphone to recording (not to playback)
+      micGainNode.connect(recordingMerger, 0, 0); // Mono mic to left channel
+      micGainNode.connect(recordingMerger, 0, 1); // Mono mic to right channel
+      
+      console.log("✅ Microphone connected to recording (initially muted)");
       
     } catch (micError) {
       console.error("❌ Microphone access denied:", micError);
     }
 
-    // Connect Meet audio to destination (always on)
-    meetAudioSource.connect(destination);
-    console.log("✅ Meet audio connected to recording");
+    // Connect recording merger to recording destination
+    recordingMerger.connect(recordingDestination);
+    
+    console.log("✅ Audio setup: Meet audio → Recording + Playback, Microphone → Recording only");
 
     // Function to check mute status and update microphone gain
     const updateMicrophoneMute = async () => {
       try {
-        // Ask the content script in the Meet tab about mute status
         const response = await new Promise((resolve) => {
           chrome.tabs.sendMessage(tabId, { action: "getMuteStatus" }, (response) => {
             if (chrome.runtime.lastError) {
-              resolve({ isMuted: true }); // Default to muted if error
+              resolve({ isMuted: true });
             } else {
               resolve(response || { isMuted: true });
             }
@@ -219,52 +241,48 @@ async function startRecording(tabId) {
 
     // Check mute status every 2 seconds
     muteCheckInterval = setInterval(updateMicrophoneMute, 2000);
-    
-    // Initial mute check
     updateMicrophoneMute();
 
-    // Create final stream: video + mixed audio
-    // Create final stream: video + mixed audio
+    // Create final recording stream: video + mixed audio
     const videoTrack = tabStream.getVideoTracks()[0];
-    const mixedAudioTrack = destination.stream.getAudioTracks()[0];
+    const mixedAudioTrack = recordingDestination.stream.getAudioTracks()[0];
 
-    // 🆕 Check the ORIGINAL source tracks from tabStream for closure detection
-  const sourceVideoTrack = tabStream.getVideoTracks()[0];
-  const sourceAudioTrack = tabStream.getAudioTracks()[0];
+    // Track closure detection
+    const sourceVideoTrack = tabStream.getVideoTracks()[0];
+    const sourceAudioTrack = tabStream.getAudioTracks()[0];
 
-  if (sourceVideoTrack) {
-    sourceVideoTrack.onended = () => {
-      console.log("❌ Source video track ended - Meet tab closed");
-      stopRecording();
-    };
-  }
+    if (sourceVideoTrack) {
+      sourceVideoTrack.onended = () => {
+        console.log("❌ Source video track ended - Meet tab closed");
+        stopRecording();
+      };
+    }
 
-  if (sourceAudioTrack) {
-    sourceAudioTrack.onended = () => {
-      console.log("❌ Source audio track ended - Meet tab closed");
-      stopRecording();
-    };
-  }
+    if (sourceAudioTrack) {
+      sourceAudioTrack.onended = () => {
+        console.log("❌ Source audio track ended - Meet tab closed");
+        stopRecording();
+      };
+    }
 
-  // ✅ Now these variables are properly defined
-  if (!videoTrack) {
-    throw new Error("No video track available from tab capture");
-  }
+    if (!videoTrack) {
+      throw new Error("No video track available from tab capture");
+    }
 
-  if (!mixedAudioTrack) {
-    throw new Error("No audio track available after mixing");
-  }
+    if (!mixedAudioTrack) {
+      throw new Error("No audio track available after mixing");
+    }
 
-  const finalStream = new MediaStream([videoTrack, mixedAudioTrack]);
-  console.log("✅ Final recording stream created");
+    const finalStream = new MediaStream([videoTrack, mixedAudioTrack]);
+    console.log("✅ Final recording stream created with dual audio paths");
 
-  // Choose MIME type
-  const mimeTypes = [
+    // Choose MIME type
+    const mimeTypes = [
       'video/webm;codecs=vp9,opus',
       'video/webm;codecs=vp8,opus', 
       'video/webm;codecs=h264,opus',
       'video/webm'
-  ];
+    ];
     let supportedType = mimeTypes.find(t => MediaRecorder.isTypeSupported(t)) || 'video/webm';
 
     console.log("🎥 Using MIME type:", supportedType);
@@ -306,12 +324,12 @@ async function startRecording(tabId) {
 
     setupTabClosureDetection(tabId);
 
-
     await chrome.storage.local.set({ isRecording: true, recordingStartTime });
     chrome.runtime.sendMessage({ action: "recordingStarted" });
     
     console.log("✅ Recording started successfully!");
-    console.log("🎯 Recording will follow Google Meet mute/unmute status");
+    console.log("🎧 Meet audio is now audible in the tab while recording");
+    console.log("🎤 Recording follows Google Meet mute/unmute status");
 
   } catch (err) {
     console.error("❌ Recording start failed:", err);
@@ -1504,6 +1522,7 @@ setInterval(() => {
   if (isRecording) console.log("💓 Recorder alive -", document.getElementById("timer").textContent); 
 }, 30000);
 */
+
 
 
 
