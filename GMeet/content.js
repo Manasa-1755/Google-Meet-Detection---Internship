@@ -111,8 +111,16 @@ function checkMeetingState() {
     meetingStarted = true;
     startMeetingTimer(); // 🆕 START DURATION TIMER
     
+    // 🆕 FIX: Check auto-record permission and start recording
     if (autoRecordEnabled && !recordingStarted) {
+      console.log("🔄 Auto-record enabled - starting recording");
       startAutoRecording();
+    } else {
+      console.log("🔄 Auto-record status:", {
+        autoRecordEnabled,
+        recordingStarted,
+        permission: autoRecordEnabled ? "ENABLED" : "DISABLED"
+      });
     }
   }
 
@@ -139,13 +147,18 @@ function checkMeetingState() {
 
 // ------------------ Start / Stop Auto Recording ------------------
 function startAutoRecording() {
-  if (recordingStarted) return;
+  if (recordingStarted) {
+    console.log("⚠️ Auto recording already started, skipping");
+    return;
+  }
   recordingStarted = true;
+  console.log("🚀 Starting auto recording...");
 
   chrome.runtime.sendMessage({ action: "autoStartRecording" }, (response) => {
     if (response?.success) {
       console.log("✅ Auto recording started");
     } else {
+      console.log("❌ Failed to start auto recording:", response);
       recordingStarted = false;
     }
   });
@@ -289,8 +302,17 @@ setTimeout(async () => {
   
   // 🆕 CRITICAL: Check current meeting state immediately
   setTimeout(() => {
+    console.log("🔍 Initial meeting state check...");
     checkMeetingState();
     checkInitialMeetingState();
+
+     // 🆕 Log current state for debugging
+    console.log("📊 Initial state:", {
+      autoRecordEnabled,
+      isInMeeting, 
+      recordingStarted,
+      leaveButtonVisible: lastLeaveButtonVisible
+    });
   }, 1500);
   
   console.log("🔍 Meet Auto Recorder content script fully loaded");
@@ -308,7 +330,10 @@ function checkInitialMeetingState() {
     startMeetingTimer();
     
     if (autoRecordEnabled && !recordingStarted) {
-      startAutoRecording();
+      console.log("🚀 Auto-starting recording for existing meeting");
+      setTimeout(() => {
+        startAutoRecording();
+      }, 2000);
     }
   }
 }
@@ -335,7 +360,6 @@ function getMuteStatus() {
   }
   
   return { isMuted: true }; // Default to muted if can't detect
-}
 
 /*
 //WORKING CODE - 1
@@ -762,4 +786,5 @@ setTimeout(async () => {
   console.log("🔍 Meet Auto Recorder content script fully loaded");
 }, 1000);
 */
+
 
