@@ -114,13 +114,10 @@ function checkMeetingState() {
     // 🆕 FIX: Check auto-record permission and start recording
     if (autoRecordEnabled && !recordingStarted) {
       console.log("🔄 Auto-record enabled - starting recording");
-      startAutoRecording();
-    } else {
-      console.log("🔄 Auto-record status:", {
-        autoRecordEnabled,
-        recordingStarted,
-        permission: autoRecordEnabled ? "ENABLED" : "DISABLED"
-      });
+      // Use setTimeout to avoid blocking the main thread
+      setTimeout(async () => {
+        await startAutoRecording();
+      }, 1000);
     }
   }
 
@@ -146,24 +143,31 @@ function checkMeetingState() {
 }
 
 // ------------------ Start / Stop Auto Recording ------------------
-function startAutoRecording() {
+async function startAutoRecording() {
   if (recordingStarted) {
     console.log("⚠️ Auto recording already started, skipping");
     return;
   }
-  recordingStarted = true;
+  
   console.log("🚀 Starting auto recording...");
-
-  chrome.runtime.sendMessage({ action: "autoStartRecording" }, (response) => {
+  
+  try {
+    const response = await new Promise((resolve) => {
+      chrome.runtime.sendMessage({ action: "autoStartRecording" }, resolve);
+    });
+    
     if (response?.success) {
+      recordingStarted = true;
       console.log("✅ Auto recording started");
     } else {
       console.log("❌ Failed to start auto recording:", response);
       recordingStarted = false;
     }
-  });
+  } catch (error) {
+    console.log("❌ Error starting auto recording:", error);
+    recordingStarted = false;
+  }
 }
-
 function stopAutoRecording() {
   if (!recordingStarted) return;
   recordingStarted = false;
@@ -331,8 +335,8 @@ function checkInitialMeetingState() {
     
     if (autoRecordEnabled && !recordingStarted) {
       console.log("🚀 Auto-starting recording for existing meeting");
-      setTimeout(() => {
-        startAutoRecording();
+      setTimeout(async () => {
+        await startAutoRecording();
       }, 2000);
     }
   }
@@ -787,6 +791,7 @@ setTimeout(async () => {
   console.log("🔍 Meet Auto Recorder content script fully loaded");
 }, 1000);
 */
+
 
 
 
