@@ -25,19 +25,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   
   if (message.action === "grantAutoRecordPermission") {
     userPermissionGranted = true;
-    chrome.storage.local.set({ autoRecordPermission: true }, () => notifyAllMeetTabs(true));
+    chrome.storage.local.set({ autoRecordPermission: true }, () => {
+      notifyAllMeetTabs(true);
+      console.log("✅ Auto record permission granted");
+    });
     sendResponse({ success: true });
   }
   
   if (message.action === "revokeAutoRecordPermission") {
     userPermissionGranted = false;
-    chrome.storage.local.set({ autoRecordPermission: false }, () => notifyAllMeetTabs(false));
+    chrome.storage.local.set({ autoRecordPermission: false }, () => {
+      notifyAllMeetTabs(false)
+      console.log("❌ Auto record permission revoked");
+    });
     sendResponse({ success: true });
   }
   
-  if (message.action === "autoStartRecording") {
-    if (userPermissionGranted) startRecordingForTab(sender.tab.id);
-    sendResponse({ success: true });
+   if (message.action === "autoStartRecording") {
+    console.log("🎬 Auto-start recording requested, permission:", userPermissionGranted);
+    if (userPermissionGranted && !currentRecordingTab) {
+      console.log("✅ Starting auto recording for tab:", sender.tab.id);
+      startRecordingForTab(sender.tab.id);
+      sendResponse({ success: true });
+    } else {
+      console.log("❌ Cannot start auto recording:", {
+        permission: userPermissionGranted,
+        alreadyRecording: !!currentRecordingTab
+      });
+      sendResponse({ success: false, reason: "no_permission_or_already_recording" });
+    }
   }
 
   if (message.action === "autoStopRecording") {
@@ -505,4 +521,5 @@ setInterval(() => {
 }, 20000);
 
 */
+
 
