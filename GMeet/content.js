@@ -360,6 +360,7 @@ function getMuteStatus() {
   }
   
   return { isMuted: true }; // Default to muted if can't detect
+}
 
 /*
 //WORKING CODE - 1
@@ -786,5 +787,6 @@ setTimeout(async () => {
   console.log("🔍 Meet Auto Recorder content script fully loaded");
 }, 1000);
 */
+
 
 
