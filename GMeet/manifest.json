@@ -9,7 +9,8 @@
     "downloads",
     "storage",
     "notifications",
-    "activeTab"
+    "activeTab",
+    "scripting"
   ],
   "host_permissions": [
     "https://meet.google.com/*"
@@ -33,5 +34,4 @@
       "matches": ["https://meet.google.com/*"]
     }
   ]
-
 }
