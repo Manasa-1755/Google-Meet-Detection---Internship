@@ -1,4 +1,4 @@
-// FIXED RECORDER - RESOLVED activeTab PERMISSION ERROR
+// RECORDER.JS
 let mediaRecorder;
 let recordedChunks = [];
 let isRecording = false;
@@ -603,3 +603,4 @@ window.addEventListener('unload', () => {
     sessionStorage.removeItem('pendingRecording');
   }
 });
+
