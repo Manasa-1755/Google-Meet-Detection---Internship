@@ -1,4 +1,4 @@
-// BACKGROUND.JS
+// FIXED BACKGROUND - RESOLVED ASYNC ERRORS
 let userPermissionGranted = false;
 let currentRecordingTab = null;
 let isAutoRecording = false;
@@ -112,16 +112,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
 
       // Route status messages to active Meet tab
-      else if (message.action === "showMeetStatus" || message.action === "updateMeetTimer") {
-        chrome.tabs.query({ url: "https://*.meet.google.com/*" }, (tabs) => {
-          tabs.forEach(tab => {
+else if (message.action === "showMeetStatus" || message.action === "updateMeetTimer") {
+    chrome.tabs.query({ url: "https://*.meet.google.com/*" }, (tabs) => {
+        tabs.forEach(tab => {
             if (tab.id !== sender.tab?.id) {
-              chrome.tabs.sendMessage(tab.id, message);
+                chrome.tabs.sendMessage(tab.id, message);
             }
-          });
         });
-        sendResponse({ success: true });
-      }
+    });
+    sendResponse({ success: true });
+}
       
       else {
         sendResponse({ success: false, reason: "unknown_action" });
@@ -281,4 +281,3 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 setInterval(() => {
   chrome.runtime.getPlatformInfo(() => {});
 }, 20000);
-
