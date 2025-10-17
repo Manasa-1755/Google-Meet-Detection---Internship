@@ -21,39 +21,47 @@ function showMeetStatus(message, duration = 4000) {
     
     const status = document.createElement('div');
     status.id = 'meet-recorder-status';
-    status.textContent = message;
+    status.innerHTML = message.replace(/\n/g, '<br>');
     status.style.cssText = `
-        position: fixed;
+         position: fixed;
         top: 20px;
         right: 20px;
-        background: rgba(0,0,0,0.8);
+        background: rgba(0,0,0,0.95);
         color: white;
-        padding: 10px 15px;
-        border-radius: 8px;
-        font-family: Arial;
+        padding: 12px 16px;
+        border-radius: 10px;
+        font-family: 'Google Sans', Arial, sans-serif;
         font-size: 14px;
-        z-index: 10000;
+        z-index: 100000;
         font-weight: bold;
+        border: 2px solid #4285f4;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        backdrop-filter: blur(10px);
+        max-width: 400px;
+        word-wrap: break-word;
     `;
     
     document.body.appendChild(status);
 
     // Auto-remove ALL messages after specified duration (default 4 seconds)
-    // EXCEPT recording with timer - that stays until recording stops
-    if (!message.includes("Recording...")) {
-        setTimeout(() => {
-            const currentStatus = document.getElementById('meet-recorder-status');
-            if (currentStatus && currentStatus.textContent === message) {
-                currentStatus.remove();
-            }
-        }, duration);
-    }
+// EXCEPT recording with timer - that stays until recording stops
+if (!message.includes("Recording...")) {
+    setTimeout(() => {
+        const currentStatus = document.getElementById('meet-recorder-status');
+        if (currentStatus) {
+            currentStatus.remove();
+        }
+    }, duration);
+}
 }
 
 // DURATION CALCULATION
 function startMeetingTimer() {
     meetingStartTime = Date.now();
-    console.log(`%c📅 Meeting started at : ${new Date(meetingStartTime).toLocaleTimeString()}`,"color: #0f9d58; font-weight: bold;");
+    const startTime = new Date(meetingStartTime).toLocaleTimeString();
+    console.log(`%c📅 Meeting started at : ${startTime}`,"color: #0f9d58; font-weight: bold;");
+
+    showMeetStatus(`📅 Meeting started at: ${startTime}`, 5000);
 }
 
 function stopMeetingTimer() {
@@ -63,9 +71,12 @@ function stopMeetingTimer() {
         
         const minutes = Math.floor(totalMeetingDuration / 60);
         const seconds = totalMeetingDuration % 60;
+        const endTime = new Date(meetingEndTime).toLocaleTimeString();
 
         console.log(`%c📅 Meeting ended at : ${new Date(meetingEndTime).toLocaleTimeString()}`, "color: #d93025; font-weight: bold;");
         console.log(`%c⏱️ Duration of meeting : ${minutes}m ${seconds}s`, "color: #f4b400; font-weight: bold;");
+
+        showMeetStatus(`📅 Meeting ended at : ${endTime}\n Duration: ${minutes}m ${seconds}s`, 5000);
 
         chrome.storage.local.set({
             lastMeetingDuration: totalMeetingDuration,
@@ -142,11 +153,13 @@ function checkMeetingState() {
     isInMeeting = true;
     meetingStarted = true;
     startMeetingTimer();
+
+    const startTime = new Date(meetingStartTime).toLocaleTimeString();
     
     // 🆕 FIXED: Auto recording with proper 2-3 second delay
     if (autoRecordEnabled && !recordingStarted) {
       console.log("🔄 Auto-record enabled - starting recording in 3 seconds...");
-      showMeetStatus("🟡 Auto recording starting in 3 seconds...");
+      showMeetStatus(`📅 Meeting started at: ${startTime}\n🟡 Auto recording starting in 3 seconds...`);
       
       setTimeout(async () => {
         if (isInMeeting && autoRecordEnabled && !recordingStarted) {
@@ -154,6 +167,8 @@ function checkMeetingState() {
           await startAutoRecording();
         }
       }, 3000); // 3 second delay
+    } else {
+      showMeetStatus(`📅 Meeting started at: ${startTime}`, 5000);
     }
   }
 
