@@ -1,4 +1,5 @@
-// RECORDER
+// RECORDER - Media recording, Audio mixing, Timer management, Status broadcasting, Download handling
+
 let mediaRecorder;
 let recordedChunks = [];
 let isRecording = false;
@@ -690,3 +691,4 @@ window.addEventListener('unload', () => {
     sessionStorage.removeItem('pendingRecording');
   }
 });
+
