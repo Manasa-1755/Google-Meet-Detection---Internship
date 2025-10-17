@@ -1,4 +1,5 @@
-// FIXED AUTO RECORDING CODE
+// CONTENT - Meeting detection, UI status display, Auto-recording triggers, Duration tracking, Mute detection
+
 let isInMeeting = false;
 let recordingStarted = false;
 let autoRecordEnabled = false;
@@ -408,3 +409,4 @@ function getMuteStatus() {
   
   return { isMuted: true };
 }
+
