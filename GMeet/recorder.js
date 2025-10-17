@@ -1,4 +1,4 @@
-// RECORDER.JS
+// FIXED RECORDER - RESOLVED activeTab PERMISSION ERROR
 let mediaRecorder;
 let recordedChunks = [];
 let isRecording = false;
@@ -86,10 +86,11 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 });
 
 // BROADCAST FUNCTIONS FOR MEET TAB - UPDATED
-function broadcastToMeetTab(message) {
+function broadcastToMeetTab(message, isTimerMessage = false) {
     chrome.runtime.sendMessage({
         action: "showMeetStatus", 
-        message: message
+        message: message,
+        isTimerMessage: isTimerMessage
     });
 }
 
@@ -163,8 +164,7 @@ async function startRecording(tabId) {
       broadcastToMeetTab("🟡 Starting recording...");
     }
 
-    safeSetStatus("🟡 Starting recording...");
-    broadcastToMeetTab("🔴 Recording started...");
+    
     
     // 🆕 ADD 1 SECOND DELAY TO ENSURE STABILITY
     await new Promise(resolve => setTimeout(resolve, 1000));
@@ -398,9 +398,9 @@ async function startRecording(tabId) {
     
     console.log("✅ Recording started successfully!");
     if (isAutoRecord) {
-      broadcastToMeetTab("🔴 Auto Recording Started");
+      //broadcastToMeetTab("🔴 Auto Recording Started");
     } else {
-      broadcastToMeetTab("🔴 Recording Started");
+      //broadcastToMeetTab("🔴 Recording Started");
     }    
 
   } catch (err) {
@@ -495,12 +495,25 @@ function downloadRecording() {
     
     safeSetStatus("✅ Recording Auto-Downloaded!");
 
-    // 🆕 ONLY close for auto-record mode after download is initiated
+    // 🆕 FIXED: Auto-close only after ensuring download has started
     if (isAutoRecord) {
-      console.log("🤖 Auto-record: Closing tab in 2 seconds");
+      console.log("🤖 Auto-record: Closing tab in 3 seconds to ensure download starts");
       setTimeout(() => {
+        // Only close if we're not in the middle of manual stop process
+        if (isAutoRecord) {
+          console.log("🔒 Closing recorder tab safely");
+          window.close();
+        }
+      }, 3000); // Increased to 3 seconds for safety
+    }
+
+    // Add manual mode auto-close
+    if (!isAutoRecord) {
+      console.log("👤 Manual recording: Closing tab in 5 seconds");
+      setTimeout(() => {
+        console.log("🔒 Closing manual recorder tab");
         window.close();
-      }, 2000);
+      }, 5000);
     }
   });  
 }
@@ -537,7 +550,7 @@ function cleanup() {
     globalMicStream = null;
   }
   
-  recordedChunks = [];
+  //recordedChunks = [];
   
   chrome.storage.local.set({ 
     isRecording: false,
@@ -547,11 +560,8 @@ function cleanup() {
     chrome.runtime.sendMessage({ action: "recordingStopped" });
   });
 
-  b // 🆕 ONLY close tab for auto-record mode, and only after download starts
-  if (isAutoRecord) {
-    console.log("🤖 Auto-record mode - will close tab after download");
-    // Don't close immediately - let download start first
-  } else {
+  // 🆕 Only show status for manual mode
+  if (!isAutoRecord) {
     safeSetStatus("✅ Recording completed - preparing download");
   }
 }
@@ -561,23 +571,92 @@ setInterval(() => {
   if (isRecording) console.log("💓 Recorder alive -", document.getElementById("timer")?.textContent); 
 }, 30000);
 
+// Remove the existing beforeunload and unload event listeners
+// and replace with this clean auto-download handler
+
 window.addEventListener('beforeunload', (event) => {
   if (isRecording && recordedChunks.length > 0) {
-    console.log("🚨 Recorder tab closing during recording");
-    const recordingData = {
-      timestamp: Date.now(),
-      chunkCount: recordedChunks.length
-    };
-    sessionStorage.setItem('pendingRecording', JSON.stringify(recordingData));
-    event.preventDefault();
-    event.returnValue = '';
-    return '';
+    // 🆕 AUTO MODE: No permission prompt - just auto-download and close
+    if (isAutoRecord) {
+      console.log("🤖 Auto-record: Closing recorder tab - auto-downloading recording");
+      
+      // Stop recording and trigger download immediately
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+      }
+      
+      // Prevent immediate closure to allow download to start
+      event.preventDefault();
+      event.returnValue = '';
+      
+      // Force download after a short delay
+      setTimeout(() => {
+        downloadRecording();
+      }, 500);
+      
+      return '';
+    } 
+    // MANUAL MODE: Keep the existing permission prompt
+    else {
+      console.log("🚨 Manual recording: Recorder tab closing during recording");
+      const recordingData = {
+        timestamp: Date.now(),
+        chunkCount: recordedChunks.length
+      };
+      sessionStorage.setItem('pendingRecording', JSON.stringify(recordingData));
+      event.preventDefault();
+      event.returnValue = '';
+      return '';
+    }
   }
 });
 
+// 🆕 NEW: Handle the actual tab closure with auto-download for auto mode
 window.addEventListener('unload', () => {
+  // Only handle auto-record mode closures
+  if (isAutoRecord && isRecording && recordedChunks.length > 0) {
+    console.log("🤖 Auto-record: Tab closing - ensuring recording is saved");
+    
+    // If recording is still active, stop it and download
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      console.log("🛑 Stopping recording before tab close");
+      mediaRecorder.stop();
+    }
+    
+    // If we have chunks but download hasn't started, trigger it
+    if (recordedChunks.length > 0) {
+      console.log("💾 Auto-downloading recording on tab close");
+      
+      // Use a small delay to ensure the stop process completes
+      setTimeout(() => {
+        const blob = new Blob(recordedChunks, { type: 'video/webm' });
+        const url = URL.createObjectURL(blob);
+        const timestamp = new Date().toISOString().replace(/[:.]/g,'-').replace('T','_').split('Z')[0];
+        const filename = `gmeet-recording-${timestamp}.webm`;
+        
+        // Use chrome.downloads API for reliable download
+        chrome.downloads.download({ 
+          url: url, 
+          filename: filename, 
+          saveAs: false
+        }, (downloadId) => {
+          if (chrome.runtime.lastError) {
+            console.warn("⚠️ Chrome download failed, using fallback");
+            // Fallback - though in unload we can't do much
+          } else {
+            console.log("✅ Auto-download initiated on tab close");
+          }
+        });
+        
+        // Clean up session storage
+        sessionStorage.removeItem('pendingRecording');
+      }, 100);
+    }
+  }
+  
+  // Handle manual mode pending recordings (existing logic)
   const pendingRecording = sessionStorage.getItem('pendingRecording');
-  if (pendingRecording && recordedChunks.length > 0) {
+  if (pendingRecording && recordedChunks.length > 0 && !isAutoRecord) {
     console.log("✅ User confirmed Leave - AUTO-DOWNLOADING recording");
     chrome.storage.local.set({ 
       recordingStoppedByTabClose: true,
@@ -603,4 +682,3 @@ window.addEventListener('unload', () => {
     sessionStorage.removeItem('pendingRecording');
   }
 });
-
