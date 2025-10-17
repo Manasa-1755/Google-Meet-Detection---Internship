@@ -1,4 +1,5 @@
-// FIXED BACKGROUND - RESOLVED ASYNC ERRORS
+// BACKGROUND - Message routing, Tab management, Permission handling, Recording coordination, Auto-recording logic
+
 let userPermissionGranted = false;
 let currentRecordingTab = null;
 let isAutoRecording = false;
@@ -281,3 +282,4 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 setInterval(() => {
   chrome.runtime.getPlatformInfo(() => {});
 }, 20000);
+
