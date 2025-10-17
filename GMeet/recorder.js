@@ -1,4 +1,4 @@
-// FIXED RECORDER - RESOLVED activeTab PERMISSION ERROR
+// RECORDER
 let mediaRecorder;
 let recordedChunks = [];
 let isRecording = false;
@@ -375,11 +375,19 @@ async function startRecording(tabId) {
     };
 
     mediaRecorder.onstop = () => {
-      console.log("🛑 Recording stopped, total chunks:", recordedChunks.length);
-      stopTimer();
-      downloadRecording();
-      cleanup();
-    };
+  console.log("🛑 Recording stopped, total chunks:", recordedChunks.length);
+  stopTimer();
+  
+  // 🆕 BROADCAST STOPPED STATUS FOR BOTH MODES
+  if (isAutoRecord) {
+    broadcastToMeetTab("🟡 Auto Recording Stopped");
+  } else {
+    broadcastToMeetTab("🟡 Recording Stopped");
+  }
+  
+  downloadRecording();
+  cleanup();
+};
 
     mediaRecorder.onerror = e => {
       console.error("❌ MediaRecorder error:", e);
@@ -398,9 +406,9 @@ async function startRecording(tabId) {
     
     console.log("✅ Recording started successfully!");
     if (isAutoRecord) {
-      //broadcastToMeetTab("🔴 Auto Recording Started");
+      broadcastToMeetTab("🔴 Auto Recording Started");
     } else {
-      //broadcastToMeetTab("🔴 Recording Started");
+      broadcastToMeetTab("🔴 Recording Started");
     }    
 
   } catch (err) {
