@@ -601,7 +601,7 @@ function comprehensiveCleanup() {
     });
     
     // Update UI
-    safeSetStatus("❌ Recording failed - cleaned up");
+    safeSetStatus("❌ Recording failed \nTry clicking the Reset button in the Google Meet Recorder extension's UI");
     broadcastToMeetTab("❌ Recording failed - cleaned up");
     
     console.log("✅ Comprehensive cleanup completed");
@@ -747,3 +747,4 @@ window.addEventListener('unload', () => {
     sessionStorage.removeItem('pendingRecording');
   }
 });
+
