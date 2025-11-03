@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       activeTabId = tab.id;
       console.log("✅ Google Meet tab detected:", activeTabId);
 
-      // 🆕 FIXED: Proper async message handling
+      // Proper async message handling
       chrome.tabs.sendMessage(activeTabId, { action: "checkMeetingStatus" }, (response) => {
         if (chrome.runtime.lastError) {
           console.log("⚠️ Could not check meeting status:", chrome.runtime.lastError.message);
@@ -114,7 +114,7 @@ function updateToggleUI() {
   }
 }
 
-// 🆕 FIXED: Proper async storage change handling
+// Proper async storage change handling
 chrome.storage.onChanged.addListener((changes, namespace) => {
   if (namespace === 'local' && changes.autoRecordPermission) {
     console.log("🔄 Storage change detected for autoRecordPermission:", changes.autoRecordPermission.newValue);
@@ -129,7 +129,7 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
   }
 });
 
-// 🆕 ADD: Function to close all recorder tabs
+// Function to close all recorder tabs
 async function closeAllRecorderTabs() {
     return new Promise((resolve) => {
         chrome.tabs.query({ url: chrome.runtime.getURL("recorder.html") }, (tabs) => {
@@ -155,7 +155,7 @@ async function closeAllRecorderTabs() {
     });
 }
 
-// 🆕 ENHANCED: Force reset with recorder tab closure
+// Force reset with recorder tab closure
 document.getElementById('forceRetry').addEventListener('click', async () => {
     if (!activeTabId) return alert("❌ Please open Google Meet first");
     
@@ -188,7 +188,7 @@ document.getElementById('forceRetry').addEventListener('click', async () => {
     }
 });
 
-// 🆕 FIXED: Async toggle handler
+// Async toggle handler
 document.getElementById('autoRecordToggle').addEventListener('change', async (e) => {
   const enabled = e.target.checked;
 
@@ -232,7 +232,7 @@ document.getElementById('autoRecordToggle').addEventListener('change', async (e)
   updateUIForReady();
 });
 
-// RECORDING
+// Recording status
 async function checkRecordingStatus() {
   const result = await chrome.storage.local.get(['isRecording', 'recordingTime']);
   isRecording = result.isRecording || false;
@@ -247,7 +247,7 @@ async function checkRecordingStatus() {
   else updateUIForReady();
 }
 
-// 🆕 FIXED: Start Recording with proper error handling
+// Start Recording with proper error handling
 document.getElementById("startBtn").addEventListener("click", async () => {
   if (!activeTabId) return alert("❌ Please open Google Meet first");
 
@@ -256,7 +256,7 @@ document.getElementById("startBtn").addEventListener("click", async () => {
   document.getElementById("status").textContent = "🟡 Starting recording...";
 
   try {
-    // 🆕 FIXED: Use proper async messaging
+    // Use proper async messaging
     chrome.tabs.sendMessage(activeTabId, { action: "manualRecordingStarted" }, (response) => {
       if (chrome.runtime.lastError) {
         console.log("⚠️ Could not notify content script:", chrome.runtime.lastError.message);
@@ -281,7 +281,7 @@ document.getElementById("startBtn").addEventListener("click", async () => {
   }
 });
 
-// 🆕 FIXED: Stop Recording with proper error handling
+// Stop Recording with proper error handling
 document.getElementById("stopBtn").addEventListener("click", async () => {
   if (activeTabId) {
     try {
@@ -324,7 +324,7 @@ async function stopRecordingAndDownload() {
   }
 }
 
-// 🆕 FIXED: Proper message listener with error handling
+// Proper message listener with error handling
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   try {
     if (message.action === "timerUpdate") {
@@ -348,13 +348,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ success: false, error: error.message });
   }
   
-  return true; // 🆕 Keep message channel open for async response
+  return true; 
 });
 
-// POPUP TOOLTIP
+// Popup tooltip
 document.addEventListener('DOMContentLoaded', () => {
   const toggleContainer = document.querySelector('.permission-toggle');
   toggleContainer.title = "Automatically start/stop recording when joining/leaving Google Meet calls";
   document.getElementById('startBtn').title = "Manually start recording current Meet tab";
   document.getElementById('stopBtn').title = "Stop recording and download the video";
+  document.getElementById('forceRetry').title = "Retries auto-recording, if it failed earlier";
 });
