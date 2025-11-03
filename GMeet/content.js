@@ -324,7 +324,7 @@ async function startAutoRecording() {
         } else {
             console.log("❌ Failed to start auto recording:", response);
             recordingStarted = false;
-            showMeetStatus("❌ Auto Recording Failed");
+            showMeetStatus("❌ Auto Recording Failed \nTry clicking the Reset button in the Google Meet Recorder extension's UI");
         }
     } catch (error) {
         console.log("❌ Error starting auto recording:", error);
@@ -429,7 +429,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
   if (message.action === "showMeetStatus") {
-    showMeetStatus(message.message);
+    const duration = message.duration || 4000;
+    showMeetStatus(message.message, duration);
     sendResponse({ success: true });
   }
   
