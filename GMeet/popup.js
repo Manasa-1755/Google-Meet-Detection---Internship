@@ -1,4 +1,4 @@
-// POPUP.JS
+// FIXED POPUP - RESOLVED ASYNC ERRORS
 let activeTabId;
 let isRecording = false;
 let autoRecordEnabled = false;
@@ -127,6 +127,65 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
       stopBtn.style.backgroundColor = autoRecordEnabled ? "#666" : "#f44336";
     }
   }
+});
+
+// 🆕 ADD: Function to close all recorder tabs
+async function closeAllRecorderTabs() {
+    return new Promise((resolve) => {
+        chrome.tabs.query({ url: chrome.runtime.getURL("recorder.html") }, (tabs) => {
+            if (tabs.length === 0) {
+                console.log("✅ No recorder tabs to close");
+                resolve();
+                return;
+            }
+            
+            let closedCount = 0;
+            tabs.forEach(tab => {
+                chrome.tabs.remove(tab.id, () => {
+                    closedCount++;
+                    console.log(`✅ Closed recorder tab: ${tab.id}`);
+                    
+                    if (closedCount === tabs.length) {
+                        console.log("✅ All recorder tabs closed");
+                        resolve();
+                    }
+                });
+            });
+        });
+    });
+}
+
+// 🆕 ENHANCED: Force reset with recorder tab closure
+document.getElementById('forceRetry').addEventListener('click', async () => {
+    if (!activeTabId) return alert("❌ Please open Google Meet first");
+    
+    try {
+        console.log("🚨 Force reset triggered from popup");
+
+        // 🆕 FIRST: Close all recorder tabs
+        await closeAllRecorderTabs();
+        
+        // Force reset everything
+        await chrome.runtime.sendMessage({ action: "refreshExtensionState" });
+        await chrome.storage.local.set({ 
+            isRecording: false,
+            recordingStoppedByTabClose: true
+        });
+        
+        // Stop any active recordings
+        await chrome.runtime.sendMessage({ action: "autoStopRecording" });
+
+        // Trigger force reset in content script
+        const response = await new Promise((resolve) => {
+            chrome.tabs.sendMessage(activeTabId, { action: "forceResetAndRetry" }, resolve);
+        });
+        
+        alert("✅ Force reset complete! Auto-record will retry in 3 seconds...");
+        
+    } catch (error) {
+        console.error("❌ Error in force reset:", error);
+        alert("❌ Reset error - check console");
+    }
 });
 
 // 🆕 FIXED: Async toggle handler
