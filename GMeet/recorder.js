@@ -527,52 +527,108 @@ function downloadRecording() {
   });  
 }
 
+// 🆕 COMPREHENSIVE CLEANUP FUNCTION
+function comprehensiveCleanup() {
+    console.log("🧹 Comprehensive cleanup started");
+    
+    // Stop recording if active
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        console.log("🛑 Stopping media recorder");
+        mediaRecorder.stop();
+    }
+    
+    // Clear all intervals
+    if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        console.log("✅ Timer interval cleared");
+    }
+    
+    if (muteCheckInterval) {
+        clearInterval(muteCheckInterval);
+        muteCheckInterval = null;
+        console.log("✅ Mute check interval cleared");
+    }
+    
+    // Stop all media tracks
+    if (mediaRecorder?.stream) {
+        mediaRecorder.stream.getTracks().forEach(track => {
+            track.stop();
+            console.log("✅ Media track stopped:", track.kind);
+        });
+    }
+    
+    if (globalMicStream) {
+        globalMicStream.getTracks().forEach(track => {
+            track.stop();
+            console.log("✅ Microphone track stopped");
+        });
+        globalMicStream = null;
+    }
+    
+    // Close audio context
+    if (originalAudioContext) {
+        originalAudioContext.close().catch(e => console.log("AudioContext close error:", e));
+        originalAudioContext = null;
+        console.log("✅ Audio context closed");
+    }
+    
+    // Clean up global mic gain node
+    if (globalMicGainNode) {
+        globalMicGainNode.disconnect();
+        globalMicGainNode = null;
+        console.log("✅ Mic gain node cleaned");
+    }
+    
+    // Clear recorded chunks to free memory
+    recordedChunks = [];
+    console.log("✅ Recorded chunks cleared");
+    
+    // Reset states
+    isRecording = false;
+    isAutoRecord = false;
+    currentTabId = null;
+    console.log("✅ States reset");
+    
+    // Clear storage
+    chrome.storage.local.set({ 
+        isRecording: false,
+        recordingStoppedByTabClose: true 
+    }, () => {
+        chrome.storage.local.remove(['recordingTime', 'recordingStartTime']);
+        chrome.runtime.sendMessage({ action: "recordingStopped" });
+        console.log("✅ Storage cleared");
+    });
+    
+    // Update UI
+    safeSetStatus("❌ Recording failed - cleaned up");
+    broadcastToMeetTab("❌ Recording failed - cleaned up");
+    
+    console.log("✅ Comprehensive cleanup completed");
+}
+
+// 🆕 REFRESH EXTENSION FUNCTION (call this when needed)
+function refreshExtension() {
+    console.log("🔄 Refreshing extension state...");
+    comprehensiveCleanup();
+    
+    // Notify background to reset states
+    chrome.runtime.sendMessage({ 
+        action: "refreshExtensionState" 
+    });
+    
+    // Close recorder tab if in auto mode
+    if (isAutoRecord) {
+        setTimeout(() => {
+            window.close();
+        }, 2000);
+    }
+}
+
+// REPLACE the existing cleanup function with this:
 function cleanup() {
-  console.log("🧹 Cleaning up recording resources");
-  isRecording = false;
-  stopTimer();
-
-  // Clear mute check interval
-  if (muteCheckInterval) {
-    clearInterval(muteCheckInterval);
-    muteCheckInterval = null;
-  }
-
-  // Close audio context
-  if (originalAudioContext) {
-    originalAudioContext.close().catch(e => console.log("AudioContext close error:", e));
-    originalAudioContext = null;
-  }
-
-  // Clean up global mic gain node
-  if (globalMicGainNode) {
-    globalMicGainNode.disconnect();
-    globalMicGainNode = null;
-  }
-
-  if (mediaRecorder?.stream) {
-    mediaRecorder.stream.getTracks().forEach(track => track.stop());
-  }
-
-  if (globalMicStream) {
-    globalMicStream.getTracks().forEach(track => track.stop());
-    globalMicStream = null;
-  }
-  
-  //recordedChunks = [];
-  
-  chrome.storage.local.set({ 
-    isRecording: false,
-    recordingStoppedByTabClose: true 
-  }, () => {
-    chrome.storage.local.remove(['recordingTime', 'recordingStartTime']);
-    chrome.runtime.sendMessage({ action: "recordingStopped" });
-  });
-
-  // 🆕 Only show status for manual mode
-  if (!isAutoRecord) {
-    safeSetStatus("✅ Recording completed - preparing download");
-  }
+  console.log("🧹 Standard cleanup started");
+  comprehensiveCleanup(); // Call the comprehensive version
 }
 
 // Keep tab alive for auto-recording
@@ -691,4 +747,3 @@ window.addEventListener('unload', () => {
     sessionStorage.removeItem('pendingRecording');
   }
 });
-
