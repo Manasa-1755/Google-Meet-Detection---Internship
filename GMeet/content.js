@@ -18,7 +18,7 @@ let totalMeetingDuration = 0;
 function showMeetStatus(message, duration = 4000) {
     const existing = document.getElementById('meet-recorder-status');
     
-    // 🆕 FIX: For timer updates, just update the content instead of recreating
+    // For timer updates, just update the content instead of recreating
     if (existing && message.includes("Recording...")) {
         // Just update the content for timer messages
         existing.innerHTML = message.replace(/\n/g, '<br>');
@@ -63,7 +63,7 @@ function showMeetStatus(message, duration = 4000) {
     }
 }
 
-// DURATION CALCULATION
+// Duration calculation
 function startMeetingTimer() {
     meetingStartTime = Date.now();
     const startTime = new Date(meetingStartTime).toLocaleTimeString();
@@ -164,7 +164,7 @@ function checkMeetingState() {
 
     const startTime = new Date(meetingStartTime).toLocaleTimeString();
     
-    // 🆕 FIXED: Auto recording with proper 2-3 second delay
+    // Auto recording with proper 2-3 second delay
     if (autoRecordEnabled && !recordingStarted) {
       console.log("🔄 Auto-record enabled - starting recording in 3 seconds...");
       showMeetStatus(`📅 Meeting started at: ${startTime}\n🟡 Auto recording starting in 3 seconds...`);
@@ -199,7 +199,7 @@ function checkMeetingState() {
   chrome.storage.local.set({ isInMeeting });
 }
 
-// 🆕 ADD: Debug function to check current states
+// Debug function to check current states
 function debugStates() {
     console.log("🔍 DEBUG STATES:");
     console.log("- isInMeeting:", isInMeeting);
@@ -220,14 +220,14 @@ function debugStates() {
     });
 }
 
-// 🆕 ENHANCED FORCE RESET AND RETRY FUNCTION
+// Enhanced force reset and retry function 
 function forceResetAndRetry() {
     console.log("🔄 FORCE RESET - Resetting everything...");
     
     // Reset recording states but preserve meeting detection
     recordingStarted = false;
     
-    // 🆕 Use force detection instead of resetting isInMeeting
+    // Use force detection instead of resetting isInMeeting
     forceMeetingRedetection();
     
     // Clear any existing status messages
@@ -249,7 +249,7 @@ function forceResetAndRetry() {
     setTimeout(() => {
         console.log("🔄 Attempting auto-record after reset...");
         
-        // 🆕 Final check with force detection
+        // Final check with force detection
         forceMeetingRedetection();
         
         if (isInMeeting && autoRecordEnabled && !recordingStarted) {
@@ -265,7 +265,7 @@ function forceResetAndRetry() {
     }, 3000);
 }
 
-// 🆕 ADD: Force meeting re-detection
+// Force meeting re-detection
 function forceMeetingRedetection() {
     console.log("🔍 Force re-detecting meeting state...");
     const leaveButton = findLeaveButton();
@@ -289,7 +289,7 @@ function forceMeetingRedetection() {
 }
 
 
-// 🆕 ADD: Aggressive initial check function
+// Aggressive initial check function
 function aggressiveInitialCheck() {
     setTimeout(() => {
         console.log("🔍 Aggressive initial meeting check...");
@@ -299,7 +299,7 @@ function aggressiveInitialCheck() {
     }, 1000);
 }
 
-// Start / Stop Auto Recording - FIXED
+// Start / Stop Auto Recording 
 async function startAutoRecording() {
     if (recordingStarted) {
         console.log("⚠️ Auto recording already started, skipping");
@@ -333,7 +333,7 @@ async function startAutoRecording() {
     }
 }
 
-// 🆕 FIXED: Auto recording with proper 2-3 second delay
+// Auto recording with proper 2-3 second delay
 if (autoRecordEnabled && !recordingStarted) {
     console.log("🔄 Auto-record enabled - starting recording in 3 seconds...");
     showMeetStatus("🟡 Auto recording starting in 3 seconds...", 3000);
@@ -377,7 +377,7 @@ function setupLeaveButtonObserver() {
 }
 
 
-// Listen for Messages from Popup
+// Listen for messages from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "updateAutoRecordPermission") {
     autoRecordEnabled = message.enabled;
@@ -436,7 +436,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "updateMeetTimer") {
     const status = document.getElementById('meet-recorder-status');
     if (status && status.textContent.includes('Recording')) {
-        // 🆕 FIX: Just update the existing element content
+        // Just update the existing element content
         status.textContent = `🔴 Recording... ${message.time}`;
     } else if (isInMeeting && recordingStarted) {
         // Show recording with timer if not already showing
@@ -451,7 +451,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
 
 
-  // 🆕 KEEP ONLY THIS MESSAGE HANDLER:
+  // Keep only this message handler
   if (message.action === "forceResetAndRetry") {
     console.log("📨 Received force reset command");
     forceResetAndRetry();
@@ -461,13 +461,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-// Initial Setup - 🆕 MODIFIED
+// Initial Setup 
 setTimeout(async () => {
   await checkAutoRecordPermission();
   setupLeaveButtonObserver();
   setInterval(checkMeetingState, 2000);
   
-  // 🆕 USE AGGRESSIVE CHECKER
+  // Use aggressive checker
   aggressiveInitialCheck();
 
   console.log("🔍 Meet Auto Recorder content script fully loaded");
