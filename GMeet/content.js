@@ -224,10 +224,11 @@ function debugStates() {
 function forceResetAndRetry() {
     console.log("🔄 FORCE RESET - Resetting everything...");
     
-    // Reset ALL states
+    // Reset recording states but preserve meeting detection
     recordingStarted = false;
-    isInMeeting = false;
-    meetingStarted = false;
+    
+    // 🆕 Use force detection instead of resetting isInMeeting
+    forceMeetingRedetection();
     
     // Clear any existing status messages
     const existingStatus = document.getElementById('meet-recorder-status');
@@ -242,12 +243,17 @@ function forceResetAndRetry() {
     // Notify background
     chrome.runtime.sendMessage({ action: "refreshExtensionState" });
     
-    showMeetStatus("🔄 Force reset - retrying auto-record...");
+    showMeetStatus("🔄 Force reset - checking meeting state...");
     
     // Wait and retry auto-record
     setTimeout(() => {
         console.log("🔄 Attempting auto-record after reset...");
+        
+        // 🆕 Final check with force detection
+        forceMeetingRedetection();
+        
         if (isInMeeting && autoRecordEnabled && !recordingStarted) {
+            console.log("✅ Conditions met - starting auto recording");
             startAutoRecording();
         } else {
             console.log("❌ Conditions not met after reset:", {
@@ -257,6 +263,29 @@ function forceResetAndRetry() {
             });
         }
     }, 3000);
+}
+
+// 🆕 ADD: Force meeting re-detection
+function forceMeetingRedetection() {
+    console.log("🔍 Force re-detecting meeting state...");
+    const leaveButton = findLeaveButton();
+    const leaveVisible = leaveButton && isElementVisible(leaveButton);
+    
+    if (leaveVisible && !isInMeeting) {
+        console.log("✅ Force detected: In meeting");
+        isInMeeting = true;
+        meetingStarted = true;
+        if (!meetingStartTime) {
+            startMeetingTimer();
+        }
+        return true;
+    } else if (!leaveVisible && isInMeeting) {
+        console.log("✅ Force detected: Not in meeting");
+        isInMeeting = false;
+        meetingStarted = false;
+        return false;
+    }
+    return isInMeeting;
 }
 
 
