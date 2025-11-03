@@ -3,6 +3,7 @@
 let userPermissionGranted = false;
 let currentRecordingTab = null;
 let isAutoRecording = false;
+let autoStartTimeout = null;
 
 // Load saved permission state
 chrome.storage.local.get(['autoRecordPermission'], (result) => {
@@ -19,6 +20,32 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
 function isMeetTab(url) {
   return url && (url.includes("meet.google.com/"));
+}
+
+// 🆕 ADD: Function to close recorder tabs from background
+function closeAllRecorderTabs() {
+    return new Promise((resolve) => {
+        chrome.tabs.query({ url: chrome.runtime.getURL("recorder.html") }, (tabs) => {
+            if (tabs.length === 0) {
+                console.log("✅ No recorder tabs found to close");
+                resolve();
+                return;
+            }
+            
+            let closedCount = 0;
+            tabs.forEach(tab => {
+                chrome.tabs.remove(tab.id, () => {
+                    closedCount++;
+                    console.log(`✅ Background closed recorder tab: ${tab.id}`);
+                    
+                    if (closedCount === tabs.length) {
+                        console.log("✅ Background: All recorder tabs closed");
+                        resolve();
+                    }
+                });
+            });
+        });
+    });
 }
 
 // 🆕 FIXED: Proper async message handling
@@ -43,41 +70,97 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.log("❌ Auto record permission revoked");
         sendResponse({ success: true });
       }
-      
-      // 🆕 FIXED: Auto start recording with proper tab validation
-      else if (message.action === "autoStartRecording") {
-        console.log("🎬 Auto-start recording requested from tab:", sender.tab?.id);
-        
-        if (!sender.tab?.id) {
-          console.log("❌ No sender tab ID");
-          sendResponse({ success: false, reason: "no_tab_id" });
-          return;
-        }
-        
-        if (!userPermissionGranted) {
-          console.log("❌ Auto recording denied - no permission");
-          sendResponse({ success: false, reason: "no_permission" });
-          return;
-        }
-        
-        if (currentRecordingTab) {
-          console.log("❌ Auto recording denied - already recording tab:", currentRecordingTab);
-          sendResponse({ success: false, reason: "already_recording" });
-          return;
-        }
-        
-        console.log("✅ Starting auto recording for tab:", sender.tab.id);
-        currentRecordingTab = sender.tab.id;
-        isAutoRecording = true;
-        
-        // Start recording with 2 second delay
-        setTimeout(() => {
-          startRecordingForTab(sender.tab.id);
-        }, 2000);
-        
-        sendResponse({ success: true });
-      }
 
+      // 🆕 ADD: Debug endpoint to check background state
+else if (message.action === "getBackgroundState") {
+    console.log("🔍 Background state requested:");
+    console.log("- currentRecordingTab:", currentRecordingTab);
+    console.log("- isAutoRecording:", isAutoRecording);
+    console.log("- userPermissionGranted:", userPermissionGranted);
+    
+    sendResponse({
+        currentRecordingTab: currentRecordingTab,
+        isAutoRecording: isAutoRecording,
+        userPermissionGranted: userPermissionGranted
+    });
+}
+
+  // 🆕 UPDATE: Handle refreshExtensionState message
+else if (message.action === "refreshExtensionState") {
+    console.log("🔄 Refreshing extension state in background");
+    
+    // 🆕 Close recorder tabs first
+    await closeAllRecorderTabs();
+    
+    currentRecordingTab = null;
+    isAutoRecording = false;
+    
+    if (autoStartTimeout) {
+        clearTimeout(autoStartTimeout);
+        autoStartTimeout = null;
+    }
+    
+    sendResponse({ success: true });
+}
+      
+      // 🆕 FIXED: Auto start recording with proper state management
+else if (message.action === "autoStartRecording") {
+  console.log("🎬 Auto-start recording requested from tab:", sender.tab?.id);
+  
+  // 🆕 Clear any pending auto-start
+  if (autoStartTimeout) {
+    clearTimeout(autoStartTimeout);
+    autoStartTimeout = null;
+  }
+  
+  const handleAutoStart = async () => {
+    try {
+      if (!sender.tab?.id) {
+        console.log("❌ No sender tab ID");
+        sendResponse({ success: false, reason: "no_tab_id" });
+        return;
+      }
+      
+      if (!userPermissionGranted) {
+        console.log("❌ Auto recording denied - no permission");
+        sendResponse({ success: false, reason: "no_permission" });
+        return;
+      }
+      
+      // 🆕 AGGRESSIVE RECOVERY: Always reset states before auto-start
+      console.log("🔄 Resetting states before auto-start...");
+      currentRecordingTab = null;
+      isAutoRecording = false;
+      
+      // Clear storage to ensure clean state
+      await chrome.storage.local.set({ 
+        isRecording: false,
+        recordingStoppedByTabClose: true 
+      });
+      
+      console.log("✅ Starting auto recording for tab:", sender.tab.id);
+      currentRecordingTab = sender.tab.id;
+      isAutoRecording = true;
+      
+      // Start recording with 2 second delay
+      setTimeout(() => {
+        startRecordingForTab(sender.tab.id);
+      }, 2000);
+      
+      sendResponse({ success: true });
+      
+    } catch (error) {
+      console.error("❌ Error in autoStartRecording:", error);
+      currentRecordingTab = null;
+      isAutoRecording = false;
+      sendResponse({ success: false, error: error.message });
+    }
+  };
+  
+  // Start immediately (no additional delay)
+  handleAutoStart();
+  return true;
+}
       else if (message.action === "autoStopRecording") {
         console.log("🛑 Auto stop recording requested");
         stopAllRecordings();
@@ -282,4 +365,3 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 setInterval(() => {
   chrome.runtime.getPlatformInfo(() => {});
 }, 20000);
-
