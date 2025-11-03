@@ -15,16 +15,24 @@ let meetingStartTime = null;
 let meetingEndTime = null;
 let totalMeetingDuration = 0;
 
-// MEET UI STATUS DISPLAY
 function showMeetStatus(message, duration = 4000) {
     const existing = document.getElementById('meet-recorder-status');
+    
+    // 🆕 FIX: For timer updates, just update the content instead of recreating
+    if (existing && message.includes("Recording...")) {
+        // Just update the content for timer messages
+        existing.innerHTML = message.replace(/\n/g, '<br>');
+        return; // Don't create new element or set timeout
+    }
+    
+    // For non-timer messages, remove existing and create new
     if (existing) existing.remove();
     
     const status = document.createElement('div');
     status.id = 'meet-recorder-status';
     status.innerHTML = message.replace(/\n/g, '<br>');
     status.style.cssText = `
-         position: fixed;
+        position: fixed;
         top: 20px;
         right: 20px;
         background: rgba(0,0,0,0.95);
@@ -44,16 +52,15 @@ function showMeetStatus(message, duration = 4000) {
     
     document.body.appendChild(status);
 
-    // Auto-remove ALL messages after specified duration (default 4 seconds)
-// EXCEPT recording with timer - that stays until recording stops
-if (!message.includes("Recording...")) {
-    setTimeout(() => {
-        const currentStatus = document.getElementById('meet-recorder-status');
-        if (currentStatus) {
-            currentStatus.remove();
-        }
-    }, duration);
-}
+    // Auto-remove only non-recording messages after specified duration
+    if (!message.includes("Recording...")) {
+        setTimeout(() => {
+            const currentStatus = document.getElementById('meet-recorder-status');
+            if (currentStatus && !currentStatus.innerHTML.includes("Recording...")) {
+                currentStatus.remove();
+            }
+        }, duration);
+    }
 }
 
 // DURATION CALCULATION
@@ -190,6 +197,77 @@ function checkMeetingState() {
 
   lastLeaveButtonVisible = leaveVisible;
   chrome.storage.local.set({ isInMeeting });
+}
+
+// 🆕 ADD: Debug function to check current states
+function debugStates() {
+    console.log("🔍 DEBUG STATES:");
+    console.log("- isInMeeting:", isInMeeting);
+    console.log("- autoRecordEnabled:", autoRecordEnabled);
+    console.log("- recordingStarted:", recordingStarted);
+    console.log("- Leave button visible:", lastLeaveButtonVisible);
+    
+    // Check storage state
+    chrome.storage.local.get(['isRecording', 'autoRecordPermission'], (result) => {
+        console.log("- Storage isRecording:", result.isRecording);
+        console.log("- Storage autoRecordPermission:", result.autoRecordPermission);
+    });
+    
+    // Check background state
+    chrome.runtime.sendMessage({ action: "getBackgroundState" }, (response) => {
+        console.log("- Background currentRecordingTab:", response?.currentRecordingTab);
+        console.log("- Background isAutoRecording:", response?.isAutoRecording);
+    });
+}
+
+// 🆕 ENHANCED FORCE RESET AND RETRY FUNCTION
+function forceResetAndRetry() {
+    console.log("🔄 FORCE RESET - Resetting everything...");
+    
+    // Reset ALL states
+    recordingStarted = false;
+    isInMeeting = false;
+    meetingStarted = false;
+    
+    // Clear any existing status messages
+    const existingStatus = document.getElementById('meet-recorder-status');
+    if (existingStatus) existingStatus.remove();
+    
+    // Clear storage
+    chrome.storage.local.set({ 
+        isRecording: false,
+        recordingStoppedByTabClose: true
+    });
+    
+    // Notify background
+    chrome.runtime.sendMessage({ action: "refreshExtensionState" });
+    
+    showMeetStatus("🔄 Force reset - retrying auto-record...");
+    
+    // Wait and retry auto-record
+    setTimeout(() => {
+        console.log("🔄 Attempting auto-record after reset...");
+        if (isInMeeting && autoRecordEnabled && !recordingStarted) {
+            startAutoRecording();
+        } else {
+            console.log("❌ Conditions not met after reset:", {
+                isInMeeting,
+                autoRecordEnabled,
+                recordingStarted
+            });
+        }
+    }, 3000);
+}
+
+
+// 🆕 ADD: Aggressive initial check function
+function aggressiveInitialCheck() {
+    setTimeout(() => {
+        console.log("🔍 Aggressive initial meeting check...");
+        checkMeetingState();
+        // Double check after a delay
+        setTimeout(checkMeetingState, 2000);
+    }, 1000);
 }
 
 // Start / Stop Auto Recording - FIXED
@@ -329,6 +407,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === "updateMeetTimer") {
     const status = document.getElementById('meet-recorder-status');
     if (status && status.textContent.includes('Recording')) {
+        // 🆕 FIX: Just update the existing element content
         status.textContent = `🔴 Recording... ${message.time}`;
     } else if (isInMeeting && recordingStarted) {
         // Show recording with timer if not already showing
@@ -341,29 +420,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     handleRecordingStopped();
     sendResponse({ success: true });
   }
+
+
+  // 🆕 KEEP ONLY THIS MESSAGE HANDLER:
+  if (message.action === "forceResetAndRetry") {
+    console.log("📨 Received force reset command");
+    forceResetAndRetry();
+    sendResponse({ success: true });
+  }
   
   return true;
 });
 
-// Initial Setup
+// Initial Setup - 🆕 MODIFIED
 setTimeout(async () => {
   await checkAutoRecordPermission();
   setupLeaveButtonObserver();
   setInterval(checkMeetingState, 2000);
   
-  setTimeout(() => {
-    console.log("🔍 Initial meeting state check...");
-    checkMeetingState();
-    checkInitialMeetingState();
+  // 🆕 USE AGGRESSIVE CHECKER
+  aggressiveInitialCheck();
 
-    console.log("📊 Initial state:", {
-      autoRecordEnabled,
-      isInMeeting, 
-      recordingStarted,
-      leaveButtonVisible: lastLeaveButtonVisible
-    });
-  }, 1500);
-  
   console.log("🔍 Meet Auto Recorder content script fully loaded");
 }, 1000);
 
@@ -409,4 +486,3 @@ function getMuteStatus() {
   
   return { isMuted: true };
 }
-
