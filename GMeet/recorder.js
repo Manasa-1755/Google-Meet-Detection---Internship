@@ -87,11 +87,11 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 });
 
 // Broadcast functions for meet tab 
-function broadcastToMeetTab(message, isTimerMessage = false) {
+function broadcastToMeetTab(message, duration = 4000){
     chrome.runtime.sendMessage({
         action: "showMeetStatus", 
         message: message,
-        isTimerMessage: isTimerMessage
+        duration: duration
     });
 }
 
@@ -403,7 +403,7 @@ async function startRecording(tabId) {
     await chrome.storage.local.set({ isRecording: true, recordingStartTime });
     chrome.runtime.sendMessage({ action: "recordingStarted" });
     
-    console.log("✅ Recording started successfully!");
+    console.log("Recording is starting...");
     if (isAutoRecord) {
       broadcastToMeetTab("🔴 Auto Recording Started");
     } else {
@@ -599,8 +599,16 @@ function comprehensiveCleanup() {
     });
     
     // Update UI
-    safeSetStatus("❌ Recording failed \nTry clicking the Reset button in the Google Meet Recorder extension's UI");
-    broadcastToMeetTab("❌ Recording failed");
+    //safeSetStatus("❌ Recording failed \nTry clicking the Reset button in the Google Meet Recorder extension's UI");
+    
+     // In comprehensiveCleanup function, ensure this is working:
+    setTimeout(() => {
+      chrome.runtime.sendMessage({
+        action: "showMeetStatus", 
+        message: "❌ Auto Recording Failed \nTry clicking the Reset button in the extension's UI",
+        duration: 6000  // 🆕 Make sure this is included
+      });
+    }, 100);
     
     console.log("✅ Comprehensive cleanup completed");
 }
