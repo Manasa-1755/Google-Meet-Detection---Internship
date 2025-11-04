@@ -28,6 +28,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     await checkRecordingStatus();
     await checkAutoRecordPermission();
 
+    await verifyRecorderTabStatus();
+    
   } catch (error) {
     console.error("❌ Error checking tab:", error);
   }
@@ -243,8 +245,12 @@ async function checkRecordingStatus() {
     chrome.storage.local.remove(['recordingStoppedByTabClose']);
   }
 
-  if (isRecording) updateUIForRecording(result.recordingTime || "00:00");
-  else updateUIForReady();
+  if (isRecording) {
+    updateUIForRecording(result.recordingTime || "00:00");
+    await verifyRecorderTabStatus();
+  } else {
+    updateUIForReady();
+  }
 }
 
 // Start Recording with proper error handling
@@ -324,6 +330,26 @@ async function stopRecordingAndDownload() {
   }
 }
 
+// 🆕 NEW FUNCTION: Check if recorder tab is actually working
+async function verifyRecorderTabStatus() {
+  try {
+    const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL("recorder.html") });
+    if (tabs.length > 0) {
+      // Send a status check to recorder tab
+      chrome.tabs.sendMessage(tabs[0].id, { action: "checkRecorderStatus" }, (response) => {
+        if (chrome.runtime.lastError || !response || response.status !== "recording") {
+          console.log("🔄 Recorder tab not properly recording - resetting UI");
+          isRecording = false;
+          updateUIForReady();
+          chrome.storage.local.set({ isRecording: false });
+        }
+      });
+    }
+  } catch (error) {
+    console.log("⚠️ Error verifying recorder tab:", error);
+  }
+}
+
 // Proper message listener with error handling
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   try {
@@ -340,6 +366,21 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     else if (message.action === "autoStopRecording") {
       stopRecordingAndDownload();
+    }
+
+    else if (message.action === "recorderFailed") {
+      console.error("❌ Recorder reported failure:", message.error);
+      isRecording = false;
+      document.getElementById("status").textContent = "❌ Recording Failed: " + message.error;
+      document.getElementById("status").style.color = "#f44336";
+      document.getElementById("startBtn").disabled = false;
+      document.getElementById("startBtn").textContent = "Start Recording";
+      document.getElementById("startBtn").style.backgroundColor = "#4CAF50";
+      document.getElementById("stopBtn").disabled = true;
+      document.getElementById("stopBtn").style.backgroundColor = "#666";
+      
+      // Clear storage to reflect actual state
+      chrome.storage.local.set({ isRecording: false });
     }
     
     sendResponse({ success: true });
