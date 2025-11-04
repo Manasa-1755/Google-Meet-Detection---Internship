@@ -171,7 +171,6 @@ function checkMeetingState() {
       
       setTimeout(async () => {
         if (isInMeeting && autoRecordEnabled && !recordingStarted) {
-          console.log("🚀 Starting auto recording now...");
           await startAutoRecording();
         }
       }, 3000); // 3 second delay
@@ -338,7 +337,6 @@ if (autoRecordEnabled && !recordingStarted) {
     
     setTimeout(async () => {
         if (isInMeeting && autoRecordEnabled && !recordingStarted) {
-            console.log("🚀 Starting auto recording now...");
             await startAutoRecording();
         }
     }, 3000); // 3 second delay
@@ -514,4 +512,5 @@ function getMuteStatus() {
   
   return { isMuted: true };
 }
+
 
