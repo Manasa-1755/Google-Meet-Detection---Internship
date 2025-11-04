@@ -315,9 +315,7 @@ async function startAutoRecording() {
         });
         
         if (response?.success) {
-            recordingStarted = true;
-            console.log("✅ Auto recording started successfully");
-            //showMeetStatus("🔴 Auto Recording Started", 2000);
+            recordingStarted = true;            
             
             // Update storage to reflect recording state
             chrome.storage.local.set({ isRecording: true });
@@ -516,3 +514,4 @@ function getMuteStatus() {
   
   return { isMuted: true };
 }
+
