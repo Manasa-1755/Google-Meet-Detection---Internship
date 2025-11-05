@@ -29,6 +29,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     await checkAutoRecordPermission();
 
     await verifyRecorderTabStatus();
+
+    startUISyncChecker();
     
   } catch (error) {
     console.error("❌ Error checking tab:", error);
@@ -45,10 +47,10 @@ function updateMeetingStatusUI(isInMeeting, isRecordingFlag) {
 
   if (isInMeeting) {
     statusElement.textContent = isRecordingFlag ? "🟢 In Meet - Recording..." : "🟡 In Meet - Ready to Record";
-    statusElement.style.color = isRecordingFlag ? "#4CAF50" : "#FF9800";
+    statusElement.style.color = isRecordingFlag ? "#f3f0ecff" : "#f3f0ecff";
   } else {
     statusElement.textContent = "⚪ Not in Meeting";
-    statusElement.style.color = "#9E9E9E";
+    statusElement.style.color = "#f3f0ecff";
   }
 }
 
@@ -157,6 +159,8 @@ async function closeAllRecorderTabs() {
     });
 }
 
+
+
 // Async toggle handler
 document.getElementById('autoRecordToggle').addEventListener('change', async (e) => {
   const enabled = e.target.checked;
@@ -213,8 +217,16 @@ async function checkRecordingStatus() {
   }
 
   if (isRecording) {
-    updateUIForRecording(result.recordingTime || "00:00");
-    await verifyRecorderTabStatus();
+    const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL("recorder.html") });
+    if (tabs.length === 0) {
+      console.log("🔄 No recorder tabs found but storage says recording - resetting UI");
+      isRecording = false;
+      chrome.storage.local.set({ isRecording: false });
+      updateUIForReady();
+    } else {
+      updateUIForRecording(result.recordingTime || "00:00");
+      await verifyRecorderTabStatus();
+    }
   } else {
     updateUIForReady();
   }
@@ -297,7 +309,22 @@ async function stopRecordingAndDownload() {
   }
 }
 
-// 🆕 NEW FUNCTION: Check if recorder tab is actually working
+function startUISyncChecker() {
+  setInterval(async () => {
+    if (isRecording) {
+      // If we think we're recording but no recorder tabs exist, reset UI
+      const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL("recorder.html") });
+      if (tabs.length === 0) {
+        console.log("🔄 UI Sync: No recorder tabs but recording flag true - resetting");
+        isRecording = false;
+        updateUIForReady();
+        chrome.storage.local.set({ isRecording: false });
+      }
+    }
+  }, 3000); // Check every 3 seconds
+}
+
+// Check if recorder tab is actually working
 async function verifyRecorderTabStatus() {
   try {
     const tabs = await chrome.tabs.query({ url: chrome.runtime.getURL("recorder.html") });
@@ -311,6 +338,12 @@ async function verifyRecorderTabStatus() {
           chrome.storage.local.set({ isRecording: false });
         }
       });
+    } else {
+      // No recorder tabs found - ensure UI is reset
+      console.log("🔄 No recorder tabs found - ensuring UI is reset");
+      isRecording = false;
+      updateUIForReady();
+      chrome.storage.local.set({ isRecording: false });
     }
   } catch (error) {
     console.log("⚠️ Error verifying recorder tab:", error);
@@ -330,9 +363,25 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     else if (message.action === "recordingStopped") {
       isRecording = false;
       updateUIForReady();
+    
+      // Ensure recorder tabs are closed
+      setTimeout(() => {
+        closeAllRecorderTabs();
+      }, 1000);
     }
     else if (message.action === "autoStopRecording") {
       stopRecordingAndDownload();
+    }
+
+    else if (message.action === "recordingCompleted") {
+      console.log("✅ Popup: Recording completed - resetting UI");
+      isRecording = false;
+      updateUIForReady();
+      
+      // Ensure recorder tabs are closed
+      setTimeout(() => {
+        closeAllRecorderTabs();
+      }, 1000);
     }
 
     else if (message.action === "recorderFailed") {
@@ -366,4 +415,3 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('startBtn').title = "Manually start recording current Meet tab";
   document.getElementById('stopBtn').title = "Stop recording and download the video";
 });
-
