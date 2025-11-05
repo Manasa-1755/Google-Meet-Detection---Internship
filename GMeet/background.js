@@ -170,11 +170,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       // Route recording completion to Meet tab
       else if (message.action === "recordingCompleted") {
+        currentRecordingTab = null;
+        isAutoRecording = false;
+        
         chrome.tabs.query({ url: "https://*.meet.google.com/*" }, (tabs) => {
           tabs.forEach(tab => {
             chrome.tabs.sendMessage(tab.id, { action: "recordingCompleted" });
           });
         });
+
+        setTimeout(() => {
+          closeAllRecorderTabs();
+        }, 1000);
+
         sendResponse({ success: true });
       }
       
