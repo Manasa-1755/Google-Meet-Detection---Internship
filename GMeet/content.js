@@ -321,7 +321,7 @@ async function startAutoRecording() {
         } else {
             console.log("❌ Failed to start auto recording:", response);
             recordingStarted = false;
-            showMeetStatus("❌ Auto Recording Failed \nTry clicking the Reset button in the Google Meet Recorder extension's UI");
+            showMeetStatus("❌ Auto Recording Failed");
         }
     } catch (error) {
         console.log("❌ Error starting auto recording:", error);
@@ -512,5 +512,6 @@ function getMuteStatus() {
   
   return { isMuted: true };
 }
+
 
 
