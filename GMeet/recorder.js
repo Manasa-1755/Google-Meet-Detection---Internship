@@ -597,15 +597,12 @@ function comprehensiveCleanup() {
         chrome.runtime.sendMessage({ action: "recordingStopped" });
         console.log("✅ Storage cleared");
     });
-    
-    // Update UI
-    //safeSetStatus("❌ Recording failed \nTry clicking the Reset button in the Google Meet Recorder extension's UI");
-    
+       
      // In comprehensiveCleanup function, ensure this is working:
     setTimeout(() => {
       chrome.runtime.sendMessage({
         action: "showMeetStatus", 
-        message: "❌ Auto Recording Failed \nTry clicking the Reset button in the extension's UI",
+        message: "❌ Auto Recording Failed",
         duration: 6000  // 🆕 Make sure this is included
       });
     }, 100);
@@ -751,3 +748,4 @@ window.addEventListener('unload', () => {
     sessionStorage.removeItem('pendingRecording');
   }
 });
+
