@@ -306,7 +306,6 @@ async function startAutoRecording() {
     }
     
     console.log("🚀 Starting auto recording...");
-    //showMeetStatus("🟡 Starting auto recording...", 2000);
     
     try {
         const response = await new Promise((resolve) => {
@@ -443,7 +442,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // Add handler for recording completion
   if (message.action === "recordingCompleted") {
-    handleRecordingStopped();
+    recordingStarted = false;
+
+    if (autoRecordEnabled) {
+        showMeetStatus("✅ Auto Recording Completed & Downloaded");
+    } else {
+        showMeetStatus("✅ Recording Completed & Downloaded");
+    }
+
     sendResponse({ success: true });
   }
 
@@ -512,6 +518,4 @@ function getMuteStatus() {
   
   return { isMuted: true };
 }
-
-
 
