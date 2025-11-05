@@ -157,39 +157,6 @@ async function closeAllRecorderTabs() {
     });
 }
 
-// Force reset with recorder tab closure
-document.getElementById('forceRetry').addEventListener('click', async () => {
-    if (!activeTabId) return alert("❌ Please open Google Meet first");
-    
-    try {
-        console.log("🚨 Force reset triggered from popup");
-
-        // 🆕 FIRST: Close all recorder tabs
-        await closeAllRecorderTabs();
-        
-        // Force reset everything
-        await chrome.runtime.sendMessage({ action: "refreshExtensionState" });
-        await chrome.storage.local.set({ 
-            isRecording: false,
-            recordingStoppedByTabClose: true
-        });
-        
-        // Stop any active recordings
-        await chrome.runtime.sendMessage({ action: "autoStopRecording" });
-
-        // Trigger force reset in content script
-        const response = await new Promise((resolve) => {
-            chrome.tabs.sendMessage(activeTabId, { action: "forceResetAndRetry" }, resolve);
-        });
-        
-        alert("✅ Force reset complete! Auto-record will retry in 3 seconds...");
-        
-    } catch (error) {
-        console.error("❌ Error in force reset:", error);
-        alert("❌ Reset error - check console");
-    }
-});
-
 // Async toggle handler
 document.getElementById('autoRecordToggle').addEventListener('change', async (e) => {
   const enabled = e.target.checked;
@@ -398,5 +365,5 @@ document.addEventListener('DOMContentLoaded', () => {
   toggleContainer.title = "Automatically start/stop recording when joining/leaving Google Meet calls";
   document.getElementById('startBtn').title = "Manually start recording current Meet tab";
   document.getElementById('stopBtn').title = "Stop recording and download the video";
-  document.getElementById('forceRetry').title = "Retries auto-recording, if it failed earlier";
 });
+
