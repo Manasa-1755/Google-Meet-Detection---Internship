@@ -293,8 +293,11 @@ function aggressiveInitialCheck() {
     setTimeout(() => {
         console.log("🔍 Aggressive initial meeting check...");
         checkMeetingState();
-        // Double check after a delay
-        setTimeout(checkMeetingState, 2000);
+        setTimeout(() => {
+            if (!isInMeeting) { // Only check if we're not already in a meeting
+                checkMeetingState();
+            }
+        }, 2000);
     }, 1000);
 }
 
@@ -329,16 +332,34 @@ async function startAutoRecording() {
     }
 }
 
-// Auto recording with proper 2-3 second delay
-if (autoRecordEnabled && !recordingStarted) {
-    console.log("🔄 Auto-record enabled - starting recording in 3 seconds...");
-    showMeetStatus("🟡 Auto recording starting in 3 seconds...", 3000);
+// Enhanced initial setup with state recovery
+async function initializeWithStateRecovery() {
+    await checkAutoRecordPermission();
+    setupLeaveButtonObserver();
     
-    setTimeout(async () => {
-        if (isInMeeting && autoRecordEnabled && !recordingStarted) {
-            await startAutoRecording();
-        }
-    }, 3000); // 3 second delay
+    // Check if we need to recover from previous state
+    const storageState = await new Promise(resolve => {
+        chrome.storage.local.get(['isRecording', 'isInMeeting'], resolve);
+    });
+    
+    console.log("🔄 State recovery check:", storageState);
+    
+    // If storage says we're in meeting but our state doesn't match, force re-detection
+    if (storageState.isInMeeting && !isInMeeting) {
+        console.log("🔄 Recovering meeting state from storage");
+        forceMeetingRedetection();
+    }
+    
+    // If storage says recording but we don't think so, reset
+    if (storageState.isRecording && !recordingStarted) {
+        console.log("🔄 Resetting inconsistent recording state");
+        chrome.storage.local.set({ isRecording: false });
+    }
+    
+    checkInitialMeetingState();
+
+    setInterval(checkMeetingState, 2000);
+    aggressiveInitialCheck();
 }
 
 function stopAutoRecording() {
@@ -464,16 +485,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
-// Initial Setup 
+// Initial Setup with State Recovery
 setTimeout(async () => {
-  await checkAutoRecordPermission();
-  setupLeaveButtonObserver();
-  setInterval(checkMeetingState, 2000);
-  
-  // Use aggressive checker
-  aggressiveInitialCheck();
-
-  console.log("🔍 Meet Auto Recorder content script fully loaded");
+    await initializeWithStateRecovery();
+    console.log("🔍 Meet Auto Recorder content script fully loaded with state recovery");
 }, 1000);
 
 // Check if already in meeting when script loads
@@ -485,7 +500,11 @@ function checkInitialMeetingState() {
         console.log("🔍 Already in meeting - will auto-start recording in 3 seconds");
         isInMeeting = true;
         meetingStarted = true;
-        startMeetingTimer();
+        
+        // Only start timer if not already running (page refresh case)
+        if (!meetingStartTime) {
+            startMeetingTimer();
+        }
         
         if (autoRecordEnabled && !recordingStarted) {
             console.log("🚀 Auto-starting recording for existing meeting");
@@ -496,6 +515,70 @@ function checkInitialMeetingState() {
         }
     }
 }
+
+// Enhanced force reset function in content.js
+function forceResetAndRetry() {
+    console.log("🔄 FORCE RESET - Resetting everything...");
+    
+    // Reset all recording states
+    recordingStarted = false;
+    
+    // Force meeting re-detection
+    forceMeetingRedetection();
+    
+    // Clear any existing status messages
+    const existingStatus = document.getElementById('meet-recorder-status');
+    if (existingStatus) existingStatus.remove();
+    
+    // Clear storage
+    chrome.storage.local.set({ 
+        isRecording: false,
+        recordingStoppedByTabClose: true
+    });
+    
+    // Notify background to cleanup
+    chrome.runtime.sendMessage({ action: "refreshExtensionState" });
+    
+    showMeetStatus("🔄 Force reset - checking meeting state...");
+    
+    // Wait and retry auto-record if conditions are met
+    setTimeout(() => {
+        console.log("🔄 Attempting auto-record after reset...");
+        
+        // Final check with force detection
+        forceMeetingRedetection();
+        
+        if (isInMeeting && autoRecordEnabled && !recordingStarted) {
+            console.log("✅ Conditions met - starting auto recording");
+            startAutoRecording();
+        } else {
+            console.log("❌ Conditions not met after reset:", {
+                isInMeeting,
+                autoRecordEnabled,
+                recordingStarted
+            });
+        }
+    }, 3000);
+}
+
+// Add this periodic health check in content.js
+function startPeriodicHealthChecks() {
+  setInterval(() => {
+    // Check if we're supposed to be recording but no recorder is active
+    chrome.storage.local.get(['isRecording'], (result) => {
+      if (result.isRecording && !recordingStarted) {
+        console.log("⚠️ Storage says recording but content script doesn't - triggering cleanup");
+        chrome.runtime.sendMessage({ action: "cleanupFailedRecorders" });
+      }
+    });
+  }, 10000); // Check every 10 seconds
+}
+
+// Call this in your initialization
+setTimeout(() => {
+    startPeriodicHealthChecks();
+}, 5000);
+
 
 // Mute status detection
 function getMuteStatus() {
