@@ -172,7 +172,34 @@ async function closeAllRecorderTabs() {
     });
 }
 
+document.getElementById('forceRetry').addEventListener('click', async () => {
+    if (!activeTabId) return alert("❌ Please open Google Meet first");
+    
+    try {
+      console.log("🚨 Force reset triggered from popup");
 
+        // Force reset everything
+        await chrome.runtime.sendMessage({ action: "refreshExtensionState" });
+        await chrome.storage.local.set({ 
+          isRecording: false ,
+          recordingStoppedByTabClose: true
+        });
+        
+        // Stop any active recordings
+        await chrome.runtime.sendMessage({ action: "autoStopRecording" });
+
+        // Trigger force reset in content script
+        const response = await new Promise((resolve) => {
+            chrome.tabs.sendMessage(activeTabId, { action: "forceResetAndRetry" }, resolve);
+        });
+        
+        alert("✅ Force reset complete! Auto-record will retry in 3 seconds...");
+        
+    } catch (error) {
+        console.error("❌ Error in force reset:", error);
+        alert("❌ Reset error - check console");
+    }
+});
 
 // Async toggle handler
 document.getElementById('autoRecordToggle').addEventListener('change', async (e) => {
