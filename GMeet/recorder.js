@@ -461,7 +461,7 @@ async function startRecording(tabId) {
   } catch (err) {
     console.error("❌ Recording start failed:", err);
     safeSetStatus("❌ Recording failed: " + err.message);
-    broadcastToMeetTab("❌ Recording failed");
+    broadcastToMeetTab("❌ Recording failed. \nTry clicking the Reset button in UI to restart auto-recording.");
     
     // Clean up on failure
     cleanup();
@@ -777,4 +777,5 @@ window.addEventListener('unload', () => {
 });
 
 console.log("🎬 GMeet Recorder tab loaded - starting initialization check");
+
 checkRecorderInitialization();
