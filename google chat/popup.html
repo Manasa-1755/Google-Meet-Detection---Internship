@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Call Monitor</title>
+    <style>
+        body { 
+            width: 300px; 
+            padding: 20px; 
+            text-align: center; 
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f8f9fa;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status { 
+            padding: 15px; 
+            border-radius: 8px; 
+            margin: 15px 0; 
+            font-weight: 600;
+            font-size: 14px;
+            border: 2px solid transparent;
+        }
+        .in-call { 
+            background: #ffebee; 
+            color: #d32f2f; 
+            border-color: #ffcdd2;
+        }
+        .no-call { 
+            background: #e8f5e8; 
+            color: #2e7d32; 
+            border-color: #c8e6c9;
+        }
+        .call-info { 
+            font-size: 12px; 
+            margin-top: 15px; 
+            text-align: left;
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid #4285f4;
+        }
+        .info-title {
+            font-weight: 600;
+            color: #5f6368;
+            margin-bottom: 5px;
+        }
+        .info-value {
+            color: #202124;
+            font-weight: 500;
+        }
+        .duration {
+            color: #d32f2f;
+            font-weight: 600;
+        }
+        .icon {
+            font-size: 20px;
+            margin-bottom: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">📞</div>
+        <h3 style="margin: 0 0 15px 0; color: #202124;">Call Monitor</h3>
+        
+        <div id="status" class="status no-call">Checking status...</div>
+        <div id="callInfo" class="call-info"></div>
+    </div>
+    
+    <script src="popup.js"></script>
+</body>
+</html>
