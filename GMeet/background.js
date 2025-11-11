@@ -185,6 +185,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         sendResponse({ success: true });
       }
+
+      else if (message.action === "recorderFailed") {
+  console.error("❌ Recorder tab reported failure:", message.error);
+  
+  // Reset states since recording failed
+  currentRecordingTab = null;
+  isAutoRecording = false;
+  
+  // Clear storage to reflect actual state
+  await chrome.storage.local.set({ 
+    isRecording: false,
+    recordingStoppedByTabClose: true 
+  });
+  
+  console.log("🔄 Background: Reset states after recorder failure");
+  
+  sendResponse({ success: true });
+}
       
       else if (message.action === "checkMeetingStatus") {
         chrome.tabs.sendMessage(sender.tab.id, { action: "checkMeetingStatus" }, sendResponse);
