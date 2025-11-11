@@ -14,6 +14,7 @@ let meetingStarted = false;
 let meetingStartTime = null;
 let meetingEndTime = null;
 let totalMeetingDuration = 0;
+let autoRecordInProgress = false;
 
 function showMeetStatus(message, duration = 4000) {
     const existing = document.getElementById('meet-recorder-status');
@@ -171,7 +172,7 @@ function checkMeetingState() {
       
       setTimeout(async () => {
         if (isInMeeting && autoRecordEnabled && !recordingStarted) {
-          await startAutoRecording();
+          await autoRecordWithReset();
         }
       }, 3000); // 3 second delay
     } else {
@@ -218,6 +219,35 @@ function debugStates() {
         console.log("- Background isAutoRecording:", response?.isAutoRecording);
     });
 }
+
+// Add this new function to content.js
+function autoRecordWithReset() {
+    console.log("🤖 AUTO-RECORD: Starting with reset...");
+    
+    // Quick reset without long delays
+    recordingStarted = false;
+    
+    // Force meeting detection immediately
+    forceMeetingRedetection();
+    
+    // Clear any conflicting storage
+    chrome.storage.local.set({ 
+        isRecording: false,
+        recordingStoppedByTabClose: true
+    });
+    
+    // Notify background
+    chrome.runtime.sendMessage({ action: "refreshExtensionState" });
+    
+    // Start recording immediately (no additional delay)
+    if (isInMeeting && autoRecordEnabled && !recordingStarted) {
+        console.log("✅ Auto-record conditions met - starting immediately");
+        startAutoRecording();
+    } else {
+        console.log("❌ Auto-record conditions not met after quick reset");
+    }
+}
+
 
 // Enhanced force reset and retry function 
 function forceResetAndRetry() {
@@ -307,6 +337,8 @@ async function startAutoRecording() {
         console.log("⚠️ Auto recording already started, skipping");
         return;
     }
+
+    autoRecordInProgress = true;
     
     console.log("🚀 Starting auto recording...");
     
@@ -329,6 +361,8 @@ async function startAutoRecording() {
         console.log("❌ Error starting auto recording:", error);
         recordingStarted = false;
         showMeetStatus("❌ Auto Recording Error");
+    } finally {
+      autoRecordInProgress = false;
     }
 }
 
@@ -510,56 +544,12 @@ function checkInitialMeetingState() {
             console.log("🚀 Auto-starting recording for existing meeting");
             showMeetStatus("🟡 Auto recording starting in 3 seconds...", 3000);
             setTimeout(async () => {
-                await startAutoRecording();
+                await autoRecordWithReset();
             }, 3000);
         }
     }
 }
 
-// Enhanced force reset function in content.js
-function forceResetAndRetry() {
-    console.log("🔄 FORCE RESET - Resetting everything...");
-    
-    // Reset all recording states
-    recordingStarted = false;
-    
-    // Force meeting re-detection
-    forceMeetingRedetection();
-    
-    // Clear any existing status messages
-    const existingStatus = document.getElementById('meet-recorder-status');
-    if (existingStatus) existingStatus.remove();
-    
-    // Clear storage
-    chrome.storage.local.set({ 
-        isRecording: false,
-        recordingStoppedByTabClose: true
-    });
-    
-    // Notify background to cleanup
-    chrome.runtime.sendMessage({ action: "refreshExtensionState" });
-    
-    showMeetStatus("🔄 Force reset - checking meeting state...");
-    
-    // Wait and retry auto-record if conditions are met
-    setTimeout(() => {
-        console.log("🔄 Attempting auto-record after reset...");
-        
-        // Final check with force detection
-        forceMeetingRedetection();
-        
-        if (isInMeeting && autoRecordEnabled && !recordingStarted) {
-            console.log("✅ Conditions met - starting auto recording");
-            startAutoRecording();
-        } else {
-            console.log("❌ Conditions not met after reset:", {
-                isInMeeting,
-                autoRecordEnabled,
-                recordingStarted
-            });
-        }
-    }, 3000);
-}
 
 // Add this periodic health check in content.js
 function startPeriodicHealthChecks() {
@@ -601,4 +591,3 @@ function getMuteStatus() {
   
   return { isMuted: true };
 }
-
