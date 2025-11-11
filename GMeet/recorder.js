@@ -686,35 +686,28 @@ window.addEventListener('beforeunload', (event) => {
         mediaRecorder.stop();
       }
       
-      // Prevent immediate closure to allow download to start
-      event.preventDefault();
-      event.returnValue = '';
+      // ❌ REMOVE THESE LINES - they trigger the confirmation dialog
+      // event.preventDefault();
+      // event.returnValue = '';
       
       // Force download after a short delay
       setTimeout(() => {
         downloadRecording();
       }, 500);
       
-      return '';
+      // ✅ Just return without preventing default - allows silent closure
+      return;
     } 
-    // MANUAL MODE: Keep the existing permission prompt
+    // MANUAL MODE: Show confirmation dialog, but don't stop/download until user confirms
     else {
-      console.log("🚨 Manual recording: Recorder tab closing during recording");
+      console.log("🚨 Manual recording: Showing leave confirmation dialog");
       
-      // Stop recording and trigger download immediately (same as auto mode)
-      if (mediaRecorder && mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-      }
-
+      // Don't stop recording here - wait for user decision
+      // Just show the browser's native confirmation dialog
       event.preventDefault();
-      event.returnValue = '';
+      event.returnValue = 'Recording is in progress. Are you sure you want to leave?';
       
-      // Force download after a short delay (same as auto mode)
-      setTimeout(() => {
-        downloadRecording();
-      }, 500);
-      
-      return '';
+      return event.returnValue;
     }
   } // If recording is NOT active (already stopped/downloaded), allow silent closure
   else {
@@ -729,18 +722,32 @@ window.addEventListener('unload', () => {
   if (isRecording && recordedChunks.length > 0) {
     console.log(`🤖 ${isAutoRecord ? 'Auto' : 'Manual'} recording: Tab closing - ensuring recording is saved`);
 
-    // If recording is still active, stop it and download
-    if (mediaRecorder && mediaRecorder.state === 'recording') {
-      console.log("🛑 Stopping recording before tab close");
-      mediaRecorder.stop();
-    }
-    
-    // If we have chunks but download hasn't started, trigger it
-    if (recordedChunks.length > 0) {
-      console.log("💾 Auto-downloading recording on tab close");
+    // AUTO MODE: Stop and download immediately
+    if (isAutoRecord) {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        console.log("🛑 Auto-mode: Stopping recording before tab close");
+        mediaRecorder.stop();
+      }
       
-      // Use a small delay to ensure the stop process completes
-      setTimeout(() => {
+      // Ensure download for auto-mode
+      if (recordedChunks.length > 0) {
+        console.log("💾 Auto-mode: Auto-downloading recording");
+        setTimeout(() => {
+          downloadRecording();
+        }, 100);
+      }
+    }
+    // MANUAL MODE: Force download immediately when user confirms leave
+    else {
+      console.log("💾 Manual mode: User confirmed leave - forcing immediate download");
+      
+      // Stop recording first
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+      }
+      
+      // Force download immediately without waiting for mediaRecorder.onstop
+      if (recordedChunks.length > 0) {
         const blob = new Blob(recordedChunks, { type: 'video/webm' });
         const url = URL.createObjectURL(blob);
         const timestamp = new Date().toISOString().replace(/[:.]/g,'-').replace('T','_').split('Z')[0];
@@ -753,18 +760,13 @@ window.addEventListener('unload', () => {
           saveAs: false        
         });
         
-        // Clean up session storage
-        sessionStorage.removeItem('pendingRecording');
-      
-        // Send completion message for manual mode too
-        if (!isAutoRecord) {
-          chrome.runtime.sendMessage({ action: "recordingCompleted" });
-          chrome.runtime.sendMessage({
-            action: "showMeetStatus", 
-            message: "✅ Recording Stopped and Auto-Downloaded"
-          });
-        }
-      }, 100);
+        // Send completion message
+        chrome.runtime.sendMessage({ action: "recordingCompleted" });
+        chrome.runtime.sendMessage({
+          action: "showMeetStatus", 
+          message: "✅ Recording Stopped and Auto-Downloaded"
+        });
+      }
     }
   }
   
