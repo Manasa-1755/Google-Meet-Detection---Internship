@@ -653,76 +653,76 @@
     
     let userConfirmedLeave = false;
 
-window.addEventListener('beforeunload', (event) => {
-    if (isRecording && recordedChunks.length > 0) {
-        if (isAutoRecord) {
-            console.log("🤖 Auto-record: Closing recorder tab - auto-downloading recording");
-            // For auto-record: proceed with download
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
+    window.addEventListener('beforeunload', (event) => {
+        if (isRecording && recordedChunks.length > 0) {
+            if (isAutoRecord) {
+                console.log("🤖 Auto-record: Closing recorder tab - auto-downloading recording");
+                // For auto-record: proceed with download
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                }
+            
+                event.preventDefault();
+                event.returnValue = '';
+            
+                setTimeout(() => {
+                    downloadRecording();
+                }, 500);
+            
+                return '';
+            } else {
+                // For manual recording: Show warning and wait for user decision
+                console.log("🚨 Manual recording: Recorder tab closing warning");
+                event.preventDefault();
+                event.returnValue = 'Recording is in progress. Are you sure you want to leave?';
+            
+                // Set a flag to track user decision
+                setTimeout(() => {
+                    // If we're still here after a short delay, user clicked "Cancel"
+                    userConfirmedLeave = false;
+                    console.log("✅ User clicked Cancel - continuing recording");
+                }, 100);
+            
+                return event.returnValue;
             }
-            
-            event.preventDefault();
-            event.returnValue = '';
-            
-            setTimeout(() => {
-                downloadRecording();
-            }, 500);
-            
-            return '';
-        } else {
-            // For manual recording: Show warning and wait for user decision
-            console.log("🚨 Manual recording: Recorder tab closing warning");
-            event.preventDefault();
-            event.returnValue = 'Recording is in progress. Are you sure you want to leave?';
-            
-            // Set a flag to track user decision
-            setTimeout(() => {
-                // If we're still here after a short delay, user clicked "Cancel"
-                userConfirmedLeave = false;
-                console.log("✅ User clicked Cancel - continuing recording");
-            }, 100);
-            
-            return event.returnValue;
         }
-    }
-});
+    });
 
-window.addEventListener('unload', () => {
-    // This only runs when user actually leaves the page
-    if (isRecording && recordedChunks.length > 0) {
-        console.log(`🚨 Tab closing - saving recording (Auto: ${isAutoRecord})`);
+    window.addEventListener('unload', () => {
+        // This only runs when user actually leaves the page
+        if (isRecording && recordedChunks.length > 0) {
+            console.log(`🚨 Tab closing - saving recording (Auto: ${isAutoRecord})`);
         
-        if (recordedChunks.length > 0) {
-            console.log("💾 Immediately downloading recording data before tab closes");
+            if (recordedChunks.length > 0) {
+                console.log("💾 Immediately downloading recording data before tab closes");
             
-            // Use synchronous download approach
-            const blob = new Blob(recordedChunks, { type: 'video/webm' });
-            const url = URL.createObjectURL(blob);
-            const timestamp = new Date().toISOString().replace(/[:.]/g,'-').replace('T','_').split('Z')[0];
-            const filename = `${currentService}-recording-${timestamp}.webm`;
+                // Use synchronous download approach
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const timestamp = new Date().toISOString().replace(/[:.]/g,'-').replace('T','_').split('Z')[0];
+                const filename = `${currentService}-recording-${timestamp}.webm`;
             
-            // Create and trigger download immediately
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+                // Create and trigger download immediately
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
             
-            // Send completion message
-            chrome.runtime.sendMessage({ action: "recordingCompleted" });
-            
-            console.log("✅ Recording downloaded before tab close");
-        }
+                // Send completion message
+                chrome.runtime.sendMessage({ action: "recordingCompleted" });
+                
+                console.log("✅ Recording downloaded before tab close");
+            }
 
-        // User confirmed they want to leave - save the recording
-        if (mediaRecorder && mediaRecorder.state === 'recording') {
-            console.log("🛑 Stopping media recorder for download");
-            mediaRecorder.stop();
-        } 
-    }
-});
+            // User confirmed they want to leave - save the recording
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                console.log("🛑 Stopping media recorder for download");
+                mediaRecorder.stop();
+            } 
+        }
+    });
 
     // Keep tab alive
     setInterval(() => { 

@@ -924,10 +924,7 @@
         let leaveButtonObserver = null;
         let lastLeaveButtonVisible = false;
 
-        // Meeting Detection + Timer + Duration
-        let timerEl = null;
-        let timerInterval = null;
-        let recordStartTime = null;
+        // Meeting Detection + Timer + Duration        
         let meetingStarted = false;
         let meetingStartTime = null;
         let meetingEndTime = null;
@@ -1023,23 +1020,23 @@
         }
 
         async function checkAutoRecordPermission() {
-    return new Promise((resolve) => {
-        chrome.storage.local.get(['autoRecordPermissions'], (result) => {
-            // Get service-specific permission
-            autoRecordEnabled = result.autoRecordPermissions?.['gmeet'] || false;
-            console.log(`🔐 Auto record enabled for gmeet:`, autoRecordEnabled);
-            resolve(autoRecordEnabled);
-        });
-    });
-}
-
+            return new Promise((resolve) => {
+                chrome.storage.local.get(['autoRecordPermissions'], (result) => {
+                    // Get service-specific permission
+                    autoRecordEnabled = result.autoRecordPermissions?.['gmeet'] || false;
+                    console.log(`🔐 Auto record enabled for gmeet:`, autoRecordEnabled);
+                    resolve(autoRecordEnabled);
+                });
+            });
+        }
+        
         function startAutoRecordingImmediately() {
-    if (isInMeeting && autoRecordEnabled && !recordingStarted) {
-        console.log("🚀 Auto-record toggled ON mid-meeting - starting recording immediately");
-        showMeetStatus("🟡 Auto recording starting now...");
-        startAutoRecording();
-    }
-    }
+            if (isInMeeting && autoRecordEnabled && !recordingStarted) {
+                console.log("🚀 Auto-record toggled ON mid-meeting - starting recording immediately");
+                showMeetStatus("🟡 Auto recording starting now...");
+                startAutoRecording();
+            }
+        }
 
         function findLeaveButton() {
             const selectors = [
@@ -1302,10 +1299,10 @@
             }
 
             if (message.action === "autoRecordToggledOn") {
-        autoRecordEnabled = message.enabled;
-        console.log("🔄 Auto-record toggled ON, checking if we're in a meeting...");
-        startAutoRecordingImmediately();
-        sendResponse({ success: true });
+                autoRecordEnabled = message.enabled;
+                console.log("🔄 Auto-record toggled ON, checking if we're in a meeting...");
+                startAutoRecordingImmediately();
+                sendResponse({ success: true });
             }
 
             if (message.action === "checkMeetingStatus") {
@@ -1668,7 +1665,7 @@
                 `;
                 notification.textContent = `🔴 Meeting Started - ${currentTime}`;
             }  else if (type === "autoRecordingStarted") {
-            notification.style.cssText = `
+                notification.style.cssText = `
                 position: fixed;
                 top: 10px;
                 left: 50%;
@@ -1683,9 +1680,9 @@
                 font-weight: bold;
                 box-shadow: 0 4px 12px rgba(0,0,0,0.3);
                 border: 2px solid #1976D2;
-            `;
-            notification.textContent = `🎬 Auto Recording Started - ${currentTime}`;
-        } else {
+                `;
+                notification.textContent = `🎬 Auto Recording Started - ${currentTime}`;
+            } else {
                 notification.style.cssText = `
                     position: fixed;
                     top: 10px;
@@ -1745,77 +1742,77 @@
         }
 
         function checkIfInMeeting() {
-        // Check for various indicators that we're in a Teams meeting
-        const indicators = [
-            // Video container
-            '[data-tid="video-layout"]',
-            '[data-tid="meeting-container"]',
-            // Participant list
-            '[data-tid="roster-list"]',
-            // Meeting controls
-            '[data-tid="meeting-controls"]',
-            '[data-tid="call-controls"]',
-            // Leave button
-            '[data-tid="hangup-button"]',
-            'button[aria-label*="Leave"]',
-            'button[aria-label*="Hang up"]',
-            // Active speaker video
-            '[data-tid="active-speaker-video"]',
-            // More specific meeting indicators
-            'div[role="main"][data-tid*="meeting"]',
-            '.ts-calling-stage',
-            '.call-stage'
-        ];
+            // Check for various indicators that we're in a Teams meeting
+            const indicators = [
+                // Video container
+                '[data-tid="video-layout"]',
+                '[data-tid="meeting-container"]',
+                // Participant list
+                '[data-tid="roster-list"]',
+                // Meeting controls
+                '[data-tid="meeting-controls"]',
+                '[data-tid="call-controls"]',
+                // Leave button
+                '[data-tid="hangup-button"]',
+                'button[aria-label*="Leave"]',
+                'button[aria-label*="Hang up"]',
+                // Active speaker video
+                '[data-tid="active-speaker-video"]',
+                // More specific meeting indicators
+                'div[role="main"][data-tid*="meeting"]',
+                '.ts-calling-stage',
+                '.call-stage'
+            ];
         
-        for (const selector of indicators) {
-            const element = document.querySelector(selector);
-            if (element && isElementVisible(element)) {
-                console.log("✅ Teams meeting detected with selector:", selector);
+            for (const selector of indicators) {
+                const element = document.querySelector(selector);
+                if (element && isElementVisible(element)) {
+                    console.log("✅ Teams meeting detected with selector:", selector);
+                    return true;
+                }
+            }
+        
+            // Additional check: look for multiple video elements which indicate active meeting
+            const videoElements = document.querySelectorAll('video');
+            const visibleVideos = Array.from(videoElements).filter(video => 
+                video.readyState > 0 && 
+                video.videoWidth > 0 && 
+                video.videoHeight > 0 &&
+                isElementVisible(video)
+            );
+        
+            if (visibleVideos.length > 0) {
+                console.log("✅ Teams meeting detected via active video elements:", visibleVideos.length);
                 return true;
             }
-        }
         
-        // Additional check: look for multiple video elements which indicate active meeting
-        const videoElements = document.querySelectorAll('video');
-        const visibleVideos = Array.from(videoElements).filter(video => 
-            video.readyState > 0 && 
-            video.videoWidth > 0 && 
-            video.videoHeight > 0 &&
-            isElementVisible(video)
-        );
-        
-        if (visibleVideos.length > 0) {
-            console.log("✅ Teams meeting detected via active video elements:", visibleVideos.length);
-            return true;
-        }
-        
-        console.log("❌ No Teams meeting indicators found");
-        return false;
+            console.log("❌ No Teams meeting indicators found");
+            return false;
         }
 
         function handleMidMeetingAutoRecord() {
-        const inMeeting = checkIfInMeeting();
-        console.log("🔍 Mid-meeting auto-record check:", { 
-            inMeeting, 
-            isInMeeting, 
-            autoRecordEnabled, 
-            recordingStarted 
-        });
+            const inMeeting = checkIfInMeeting();
+            console.log("🔍 Mid-meeting auto-record check:", { 
+                inMeeting, 
+                isInMeeting, 
+                autoRecordEnabled, 
+                recordingStarted 
+            });
 
-        if (inMeeting && !isInMeeting) {
-            console.log("🔍 Detected active meeting - updating state");
-            isInMeeting = true;
-            chrome.storage.local.set({ isInMeeting: true });
-            
-            if (autoRecordEnabled && !recordingStarted) {
-                console.log("🚀 Auto-record enabled mid-meeting - starting recording");                
-                    startAutoRecordingImmediately();
+            if (inMeeting && !isInMeeting) {
+                console.log("🔍 Detected active meeting - updating state");
+                isInMeeting = true;
+                chrome.storage.local.set({ isInMeeting: true });
+                
+                if (autoRecordEnabled && !recordingStarted) {
+                    console.log("🚀 Auto-record enabled mid-meeting - starting recording");                
+                        startAutoRecordingImmediately();
+                }
+            } else if (inMeeting && isInMeeting && autoRecordEnabled && !recordingStarted) {
+                // We're already marked as in meeting but recording hasn't started
+                console.log("🚀 Already in meeting with auto-record enabled - starting recording");
+                startAutoRecordingImmediately();
             }
-        } else if (inMeeting && isInMeeting && autoRecordEnabled && !recordingStarted) {
-            // We're already marked as in meeting but recording hasn't started
-            console.log("🚀 Already in meeting with auto-record enabled - starting recording");
-            startAutoRecordingImmediately();
-        }
         }
 
         function setupJoinButtonObserver() {

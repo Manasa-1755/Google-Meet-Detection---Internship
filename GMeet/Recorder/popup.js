@@ -250,7 +250,13 @@ function updateUIForRecording(recordingTime) {
     document.getElementById("timer").textContent = recordingTime;
     document.getElementById("status").textContent = "🟢 Recording in background...";
     document.getElementById("startBtn").textContent = "Recording...";
-    document.getElementById("warning").style.display = currentService === 'teams' ? "block" : "none";
+    
+    // Add null check for warning element
+    const warningElement = document.getElementById("warning");
+    if (warningElement) {
+        warningElement.style.display = currentService === 'teams' ? "block" : "none";
+    }
+
     updateButtonStates();
 }
 
@@ -264,7 +270,13 @@ function updateUIForReady() {
     }
     
     document.getElementById("startBtn").textContent = "Start Recording";
-    document.getElementById("warning").style.display = (activeTabId && currentService === 'teams') ? "block" : "none";
+    
+    // Add null check for warning element
+    const warningElement = document.getElementById("warning");
+    if (warningElement) {
+        warningElement.style.display = (activeTabId && currentService === 'teams') ? "block" : "none";
+    }
+    
     updateButtonStates();
 }
 

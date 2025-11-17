@@ -529,13 +529,13 @@ if (message.action === "revokeAutoRecordPermission") {
         }
 
         // Check service-specific permission
-    const result = await chrome.storage.local.get(['autoRecordPermissions']);
-    const gmeetAutoRecordEnabled = result.autoRecordPermissions?.['gmeet'] || false;
+        const result = await chrome.storage.local.get(['autoRecordPermissions']);
+        const gmeetAutoRecordEnabled = result.autoRecordPermissions?.['gmeet'] || false;
     
-    if (!gmeetAutoRecordEnabled) {
-        console.log("❌ Auto recording denied - no permission for Google Meet");
-        return { success: false, reason: "no_permission" };
-    }
+        if (!gmeetAutoRecordEnabled) {
+            console.log("❌ Auto recording denied - no permission for Google Meet");
+            return { success: false, reason: "no_permission" };
+        }
 
         console.log("🔄 Resetting states before auto-start...");
         currentRecordingTab = null;
@@ -717,71 +717,69 @@ if (message.action === "revokeAutoRecordPermission") {
         const handleAsync = async () => {
             try {
                 // Common permission messages
-                // Common permission messages
-if (message.action === "grantAutoRecordPermission") {
-    // Store service-specific permission
-    const result = await chrome.storage.local.get(['autoRecordPermissions']);
-    const permissions = result.autoRecordPermissions || {};
-    permissions[message.service] = true;
-    await chrome.storage.local.set({ autoRecordPermissions: permissions });
+                if (message.action === "grantAutoRecordPermission") {
+                    // Store service-specific permission
+                    const result = await chrome.storage.local.get(['autoRecordPermissions']);
+                    const permissions = result.autoRecordPermissions || {};
+                    permissions[message.service] = true;
+                    await chrome.storage.local.set({ autoRecordPermissions: permissions });
 
-    userPermissionGranted = true;
+                    userPermissionGranted = true;
     
-    // Notify only the specific service tabs
-    if (message.service === 'gmeet') {
-        notifyAllGmeetTabs(true);
-    } else if (message.service === 'teams') {
-        notifyAllTeamsTabs(true);
-    }
-    console.log(`✅ Auto record permission granted for ${message.service}`);
-    return { success: true };
-}
-
-if (message.action === "revokeAutoRecordPermission") {
-    // Store service-specific permission
-    const result = await chrome.storage.local.get(['autoRecordPermissions']);
-    const permissions = result.autoRecordPermissions || {};
-    permissions[message.service] = false;
-    await chrome.storage.local.set({ autoRecordPermissions: permissions });
-
-    userPermissionGranted = false;
-    
-    // Notify only the specific service tabs
-    if (message.service === 'gmeet') {
-        notifyAllGmeetTabs(false);
-    } else if (message.service === 'teams') {
-        notifyAllTeamsTabs(false);
-    }
-    console.log(`❌ Auto record permission revoked for ${message.service}`);
-    return { success: true };
-}
-
-if (message.action === "autoRecordToggledOn") {
-    console.log(`🔄 Auto-record toggled ON for ${message.service}, checking current meeting...`);
-    
-    // Find active tabs for this service and notify them
-    let urlPatterns = [];
-    if (message.service === 'gmeet') {
-        urlPatterns = ["https://*.meet.google.com/*"];
-    } else if (message.service === 'teams') {
-        urlPatterns = ["https://*.teams.microsoft.com/*", "https://*.teams.live.com/*"];
-    }
-    
-    chrome.tabs.query({ url: urlPatterns }, (tabs) => {
-        tabs.forEach(tab => {
-            chrome.tabs.sendMessage(tab.id, {
-                action: "autoRecordToggledOn",
-                enabled: true
-            }, (response) => {
-                if (chrome.runtime.lastError) {
-                    console.log("⚠️ Could not notify tab:", tab.id, chrome.runtime.lastError.message);
+                    // Notify only the specific service tabs
+                    if (message.service === 'gmeet') {
+                        notifyAllGmeetTabs(true);
+                    } else if (message.service === 'teams') {
+                        notifyAllTeamsTabs(true);
+                    }
+                    console.log(`✅ Auto record permission granted for ${message.service}`);
+                    return { success: true };
                 }
-            });
-        });
-    });
+                if (message.action === "revokeAutoRecordPermission") {
+                    // Store service-specific permission
+                    const result = await chrome.storage.local.get(['autoRecordPermissions']);
+                    const permissions = result.autoRecordPermissions || {};
+                    permissions[message.service] = false;
+                    await chrome.storage.local.set({ autoRecordPermissions: permissions });
+
+                    userPermissionGranted = false;
     
-    return { success: true };
-}
+                    // Notify only the specific service tabs
+                    if (message.service === 'gmeet') {
+                        notifyAllGmeetTabs(false);
+                    } else if (message.service === 'teams') {
+                        notifyAllTeamsTabs(false);
+                    }
+                    console.log(`❌ Auto record permission revoked for ${message.service}`);
+                    return { success: true };
+                }
+
+                if (message.action === "autoRecordToggledOn") {
+                    console.log(`🔄 Auto-record toggled ON for ${message.service}, checking current meeting...`);
+    
+                    // Find active tabs for this service and notify them
+                    let urlPatterns = [];
+                    if (message.service === 'gmeet') {
+                        urlPatterns = ["https://*.meet.google.com/*"];
+                    } else if (message.service === 'teams') {
+                        urlPatterns = ["https://*.teams.microsoft.com/*", "https://*.teams.live.com/*"];
+                    }
+    
+                    chrome.tabs.query({ url: urlPatterns }, (tabs) => {
+                        tabs.forEach(tab => {
+                            chrome.tabs.sendMessage(tab.id, {
+                                action: "autoRecordToggledOn",
+                                enabled: true
+                            }, (response) => {
+                                if (chrome.runtime.lastError) {
+                                    console.log("⚠️ Could not notify tab:", tab.id, chrome.runtime.lastError.message);
+                                }
+                            });
+                        });
+                    });
+    
+                    return { success: true };
+                }
 
                 // Service-specific auto start
                 if (message.action === "autoStartRecording") {
