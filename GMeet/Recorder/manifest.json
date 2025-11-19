@@ -5,19 +5,20 @@
   "description": "Record Google Meet and Microsoft Teams meetings automatically or manually with audio mixing",
   "permissions": [
     "activeTab",
-    "tabCapture",
+    "tabCapture", 
     "storage",
     "downloads",
-    "tabs"
+    "tabs",
+    "scripting"
   ],
   "host_permissions": [
     "https://meet.google.com/*",
-    "https://teams.microsoft.com/*",
+    "https://teams.microsoft.com/*", 
     "https://teams.live.com/*"
   ],
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Meeting Recorder"    
+    "default_title": "Meeting Recorder"
   },
   "background": {
     "service_worker": "background.js"
