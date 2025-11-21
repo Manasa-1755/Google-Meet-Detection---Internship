@@ -43,6 +43,50 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
+function highlightAutoDetectedService(service) {
+    const gmeetOption = document.getElementById('gmeetOption');
+    const teamsOption = document.getElementById('teamsOption');
+    const serviceSelector = document.querySelector('.service-selector');
+    
+    // Reset both options first
+    gmeetOption.classList.remove('active', 'auto-detected', 'locked');
+    teamsOption.classList.remove('active', 'auto-detected', 'locked');
+    
+    // Disable clicking
+    gmeetOption.style.pointerEvents = 'none';
+    teamsOption.style.pointerEvents = 'none';
+    
+    // Add special styling for auto-detected service
+    if (service === 'gmeet') {
+        gmeetOption.classList.add('auto-detected', 'locked');
+        gmeetOption.querySelector('input').checked = true;
+        serviceSelector.title = `🔒 Auto-detected: Google Meet - Service locked to current page`;
+    } else if (service === 'teams') {
+        teamsOption.classList.add('auto-detected', 'locked');
+        teamsOption.querySelector('input').checked = true;
+        serviceSelector.title = `🔒 Auto-detected: Microsoft Teams - Service locked to current page`;
+    }
+    
+    // Visual indicator for the selector
+    serviceSelector.classList.add('auto-detected-mode');
+}
+
+function enableServiceSelection() {
+    const gmeetOption = document.getElementById('gmeetOption');
+    const teamsOption = document.getElementById('teamsOption');
+    const serviceSelector = document.querySelector('.service-selector');
+    
+    // Enable clicking
+    gmeetOption.style.pointerEvents = 'auto';
+    teamsOption.style.pointerEvents = 'auto';
+    
+    // Remove auto-detected styling
+    gmeetOption.classList.remove('auto-detected', 'locked');
+    teamsOption.classList.remove('auto-detected', 'locked');
+    serviceSelector.classList.remove('auto-detected-mode');
+    serviceSelector.title = 'Select meeting service';
+}
+
 async function initializePopup() {
     setupEventListeners();
     setupServiceSelection();
@@ -58,13 +102,19 @@ async function initializePopup() {
             // We're on Google Meet or Teams - show recording UI
             currentService = service;
             showRecordingUI();
+            // VISUALLY HIGHLIGHT THE AUTO-DETECTED SERVICE
+            highlightAutoDetectedService(service);
+
+            updateServiceUI(service);
         } else {
             // We're on other website - show features
             showFeaturesUI();
+            enableServiceSelection();
         }
     } else {
         // No active tab or URL - show features
         showFeaturesUI();
+        enableServiceSelection();
     }
     
     await checkRecordingStatus();
@@ -116,13 +166,31 @@ function setupServiceSelection() {
     });
 }
 
-function selectService(service) {
+async function selectService(service) {
+    // Only allow service switching if we're NOT on an actual meeting page
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const detectedService = detectServiceFromUrl(tab?.url);
+    
+    if (detectedService) {
+        // On actual meeting page - prevent switching with visual feedback
+        console.log(`❌ Cannot switch services while on ${SERVICE_CONFIG[detectedService].name} page`);
+        
+        // Show a quick visual feedback that switching is disabled
+        const targetOption = document.getElementById(service === 'gmeet' ? 'gmeetOption' : 'teamsOption');
+        targetOption.style.transform = 'scale(0.95)';
+        setTimeout(() => {
+            targetOption.style.transform = '';
+        }, 300);
+        
+        showPopupMessage(`❌ Service locked to ${SERVICE_CONFIG[detectedService].name}, since in ${SERVICE_CONFIG[detectedService].name} page.`, 'warning');
+        return;
+    }
+    
     currentService = service;
     chrome.storage.local.set({ selectedService: service });
     
     // Update UI based on selected service
     updateServiceUI(service);
-
     checkAutoRecordPermission();
     
     console.log(`✅ Service selected: ${service}`);
@@ -331,7 +399,7 @@ async function checkCurrentMeetingAndStartRecording() {
             }, resolve);
         });
         
-        if (response && response.isInMeeting && !response.recording) {
+        if (response && response.isInMeeting) {
             console.log("🎬 Currently in meeting - starting auto recording immediately");
             
             // Notify content script to start recording immediately
@@ -722,7 +790,11 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
 });
 
 
-/*WORKING CODE -1
+
+
+
+
+/*
 // UNIFIED POPUP.JS - Google Meet & Microsoft Teams
 let activeTabId;
 let isRecording = false;
@@ -777,7 +849,19 @@ async function initializePopup() {
     if (tab && tab.url) {
         activeTabId = tab.id;
         
-       showRecordingUI();
+        // Detect if we're on a supported service or other website
+        const service = detectServiceFromUrl(tab.url);
+        if (service) {
+            // We're on Google Meet or Teams - show recording UI
+            currentService = service;
+            showRecordingUI();
+        } else {
+            // We're on other website - show features
+            showFeaturesUI();
+        }
+    } else {
+        // No active tab or URL - show features
+        showFeaturesUI();
     }
     
     await checkRecordingStatus();
@@ -850,7 +934,7 @@ function updateServiceUI(service) {
     document.getElementById('teamsNote').style.display = service === 'teams' ? 'block' : 'none';
     
     // Update status
-    updateStatus(`✅ ${SERVICE_CONFIG[service].name} selected - Ready to record`);
+    updateStatus(`✅ ${SERVICE_CONFIG[service].name} selected`);
     
     // Update button states
     updateButtonStates();
@@ -869,7 +953,13 @@ function showRecordingUI() {
     // Show recording controls
     document.getElementById('recordingControls').style.display = 'block';
     
-    console.log("✅ Showing recording UI with manual service selection");
+    // Update service indicator
+    const serviceIndicator = document.getElementById('serviceIndicator');
+    if (serviceIndicator) {
+        serviceIndicator.innerHTML = `${SERVICE_CONFIG[currentService].icon} ${SERVICE_CONFIG[currentService].name}`;
+    }
+    
+    console.log("✅ Showing recording UI for:", currentService);
 }
 
 function showFeaturesUI() {
@@ -879,15 +969,11 @@ function showFeaturesUI() {
     // Show features section
     document.getElementById('featuresSection').style.display = 'block';
     
-    // Update service indicator
-    const serviceIndicator = document.getElementById('serviceIndicator');
-    serviceIndicator.innerHTML = '📋 Meeting Recorder Features';
-    
     // Reset to default theme
     updateTheme('default');
     
     // Update status to guide user
-    updateStatus("Open Google Meet or Teams", "info");
+    updateStatus("Open Google Meet or Teams to start recording", "info");
     
     console.log("📋 Showing features UI");
 }
@@ -989,7 +1075,7 @@ function updateUIForReady() {
     document.getElementById("timer").textContent = "00:00";
     
     if (activeTabId && currentService) {
-        document.getElementById("status").textContent = "✅ Ready to record";
+        document.getElementById("status").textContent = "✅ Extension is ready";
     } else {
         document.getElementById("status").textContent = "✅ Extension is ready";
     }
@@ -1042,7 +1128,7 @@ async function checkCurrentMeetingAndStartRecording() {
             }, resolve);
         });
         
-        if (response && response.isInMeeting && !response.recording) {
+        if (response && response.isInMeeting) {
             console.log("🎬 Currently in meeting - starting auto recording immediately");
             
             // Notify content script to start recording immediately
@@ -1071,17 +1157,17 @@ async function handleAutoRecordToggle(e) {
                 // Store service-specific permission
                 const result = await chrome.storage.local.get(['autoRecordPermissions']);
                 const permissions = result.autoRecordPermissions || {};
-                permissions[currentService] = true;
+                permissions[currentService] = true; // Works for both 'gmeet' and 'teams'
                 
                 await chrome.storage.local.set({ autoRecordPermissions: permissions });
-                autoRecordEnabled = true;
+                autoRecordEnabled = true; 
                 updateToggleUI();
                 updateButtonStates();
                 
                 // Grant permission in background for the current service only
                 await chrome.runtime.sendMessage({ 
                     action: "grantAutoRecordPermission", 
-                    service: currentService 
+                    service: currentService // Works for both 'gmeet' and 'teams'
                 });
 
                 await checkCurrentMeetingAndStartRecording();
@@ -1430,6 +1516,6 @@ chrome.storage.onChanged.addListener((changes, namespace) => {
             updateButtonStates();
         }
     }
-
 });
+
 */
