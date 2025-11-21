@@ -209,66 +209,65 @@
     }
     
     /* Service Selector */
-.service-selector {
-  background: rgba(255,255,255,0.1);
-  border-radius: 12px;
-  padding: 16px;
-  margin: 16px 0;
-  text-align: center;
-  border: 1px solid rgba(255,255,255,0.2);
-  backdrop-filter: blur(10px);
-}
-.service-selector > div:first-child {
-  font-size: 16px;
-  font-weight: bold;
-  margin-bottom: 12px;
-  color: #fff;
-}
-.service-options {
-  display: flex;
-  justify-content: center;
-  gap: 15px;
-  margin-top: 8px;
-}
-.service-option {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  padding: 12px 16px;
-  border-radius: 10px;
-  transition: all 0.3s ease;
-  background: rgba(255,255,255,0.1);
-  border: 2px solid transparent;
-  min-width: 100px;
-  backdrop-filter: blur(5px);
-}
-.service-option:hover {
-  background: rgba(255,255,255,0.15);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-}
-.service-option.active {
-  background: rgba(255,255,255,0.25);
-  border: 2px solid rgba(255,255,255,0.5);
-  box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-  transform: translateY(-1px);
-}
-.service-option input {
-  margin: 0;
-  width: 16px;
-  height: 16px;
-  accent-color: #4CAF50;
-}
-.service-icon {
-  font-size: 18px;
-}
-.service-option span:last-child {
-  font-size: 13px;
-  font-weight: 600;
-}
-
+    .service-selector {
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 16px 0;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+    }
+    .service-selector > div:first-child {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+    .service-options {
+      display: flex;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 8px;
+    }
+    .service-option {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      padding: 12px 16px;
+      border-radius: 10px;
+      transition: all 0.3s ease;
+      background: rgba(255,255,255,0.1);
+      border: 2px solid transparent;
+      min-width: 100px;
+      backdrop-filter: blur(5px);
+    }
+    .service-option:hover {
+      background: rgba(255,255,255,0.15);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .service-option.active {
+      background: rgba(255,255,255,0.25);
+      border: 2px solid rgba(255,255,255,0.5);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      transform: translateY(-1px);
+    }
+    .service-option input {
+      margin: 0;
+      width: 16px;
+      height: 16px;
+      accent-color: #4CAF50;
+    }
+    .service-icon {
+      font-size: 18px;
+    }
+    .service-option span:last-child {
+      font-size: 13px;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body class="default-theme">
@@ -279,21 +278,21 @@
     </div>
     
     <!-- Service Selection -->
-<div class="service-selector">
-  <div>Select Meeting Service</div>
-  <div class="service-options">
-    <label class="service-option" id="gmeetOption">
-      <input type="radio" name="service" value="gmeet">
-      <span class="service-icon">📹</span>
-      <span>Google Meet</span>
-    </label>
-    <label class="service-option" id="teamsOption">
-      <input type="radio" name="service" value="teams">
-      <span class="service-icon">💼</span>
-      <span>Teams</span>
-    </label>
-  </div>
-</div>
+    <div class="service-selector">
+      <div>Select Meeting Service</div>
+      <div class="service-options">
+        <label class="service-option" id="gmeetOption">
+          <input type="radio" name="service" value="gmeet">
+          <span class="service-icon">📹</span>
+          <span>Google Meet</span>
+        </label>
+        <label class="service-option" id="teamsOption">
+          <input type="radio" name="service" value="teams">
+          <span class="service-icon">💼</span>
+          <span>Teams</span>
+        </label>
+      </div>
+    </div>
     
     <!-- Features Section (Shown on other websites) -->
     <div class="features-section" id="featuresSection">
