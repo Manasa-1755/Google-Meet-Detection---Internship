@@ -748,66 +748,66 @@
     }
 
     // ==================== ZOOM SPECIFIC ====================
-function broadcastToZoomTab(message, duration = 4000) {
-    chrome.runtime.sendMessage({
-        action: "showZoomStatus", 
-        message: message,
-        duration: duration
-    });
-}
-
-function broadcastTimerUpdateToZoom(timeStr) {
-    chrome.runtime.sendMessage({
-        action: "updateZoomTimer",
-        time: timeStr
-    });
-}
-
-async function setupZoomAudio(tabStream) {
-    let finalStream = tabStream;
-
-    // Try to add microphone audio for Zoom
-    try {
-        console.log("🎤 Attempting to capture microphone for Zoom...");
-        const micStream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                echoCancellation: true,
-                noiseSuppression: true,
-                autoGainControl: true,
-                sampleRate: 44100,
-                channelCount: 2
-            },
-            video: false
+    function broadcastToZoomTab(message, duration = 4000) {
+        chrome.runtime.sendMessage({
+            action: "showZoomStatus", 
+            message: message,
+            duration: duration
         });
-
-        console.log("✅ Microphone captured for Zoom");
-
-        const audioContext = new AudioContext({ sampleRate: 44100 });
-        const destination = audioContext.createMediaStreamDestination();
-
-        const tabAudioSource = audioContext.createMediaStreamSource(
-            new MediaStream(tabStream.getAudioTracks())
-        );
-        const micAudioSource = audioContext.createMediaStreamSource(micStream);
-
-        tabAudioSource.connect(destination);
-        micAudioSource.connect(destination);
-
-        finalStream = new MediaStream([
-            ...tabStream.getVideoTracks(),
-            ...destination.stream.getAudioTracks()
-        ]);
-
-        originalAudioContext = audioContext;
-        console.log("✅ Audio mixed successfully for Zoom");
-
-    } catch (micError) {
-        console.warn("⚠️ Microphone not available for Zoom, using tab audio only:", micError);
-        finalStream = tabStream;
     }
 
-    setupMediaRecorder(finalStream, finalStream, originalAudioContext);
-}
+    function broadcastTimerUpdateToZoom(timeStr) {
+        chrome.runtime.sendMessage({
+            action: "updateZoomTimer",
+            time: timeStr
+        });
+    }
+
+    async function setupZoomAudio(tabStream) {
+        let finalStream = tabStream;
+
+        // Try to add microphone audio for Zoom
+        try {
+            console.log("🎤 Attempting to capture microphone for Zoom...");
+            const micStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true,
+                    sampleRate: 44100,
+                    channelCount: 2
+                },
+                video: false
+            });
+
+            console.log("✅ Microphone captured for Zoom");
+
+            const audioContext = new AudioContext({ sampleRate: 44100 });
+            const destination = audioContext.createMediaStreamDestination();
+
+            const tabAudioSource = audioContext.createMediaStreamSource(
+                new MediaStream(tabStream.getAudioTracks())
+            );
+            const micAudioSource = audioContext.createMediaStreamSource(micStream);
+
+            tabAudioSource.connect(destination);
+            micAudioSource.connect(destination);
+
+            finalStream = new MediaStream([
+                ...tabStream.getVideoTracks(),
+                ...destination.stream.getAudioTracks()
+            ]);
+
+            originalAudioContext = audioContext;
+            console.log("✅ Audio mixed successfully for Zoom");
+
+        } catch (micError) {
+            console.warn("⚠️ Microphone not available for Zoom, using tab audio only:", micError);
+            finalStream = tabStream;
+        }
+
+        setupMediaRecorder(finalStream, finalStream, originalAudioContext);
+    }
 
     // ==================== MESSAGE LISTENER ====================
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {

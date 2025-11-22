@@ -308,50 +308,50 @@
 
     // ==================== ZOOM HANDLERS ====================
     async function handleZoomTabUpdate(tabId, tab) {
-    console.log("✅ Zoom tab detected:", tabId, tab.url);
+        console.log("✅ Zoom tab detected:", tabId, tab.url);
     
-    // Check if auto-record is enabled for Zoom
-    const result = await chrome.storage.local.get(['autoRecordPermissions']);
-    const zoomAutoRecordEnabled = result.autoRecordPermissions?.['zoom'] || false;
+        // Check if auto-record is enabled for Zoom
+        const result = await chrome.storage.local.get(['autoRecordPermissions']);
+        const zoomAutoRecordEnabled = result.autoRecordPermissions?.['zoom'] || false;
     
-    if (zoomAutoRecordEnabled) {
-        console.log("🎬 Auto record enabled for Zoom - monitoring meeting state");
+        if (zoomAutoRecordEnabled) {
+            console.log("🎬 Auto record enabled for Zoom - monitoring meeting state");
         
-        // Wait for content script to initialize
-        setTimeout(() => {
-            chrome.tabs.sendMessage(tabId, { action: "checkMeetingStatus" }, (response) => {
-                if (chrome.runtime.lastError) {
-                    console.log("⚠️ Zoom content script not ready yet");
-                    return;
-                }
+            // Wait for content script to initialize
+            setTimeout(() => {
+                chrome.tabs.sendMessage(tabId, { action: "checkMeetingStatus" }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        console.log("⚠️ Zoom content script not ready yet");
+                        return;
+                    }
                 
-                if (response && response.isInMeeting && !response.recording) {
-                    console.log("✅ Zoom meeting already in progress - starting auto recording");
-                    startRecordingForTab(tabId, 'zoom');
-                }
-            });
-        }, 3000);
+                    if (response && response.isInMeeting && !response.recording) {
+                        console.log("✅ Zoom meeting already in progress - starting auto recording");
+                        startRecordingForTab(tabId, 'zoom');
+                    }
+                });
+            }, 3000);
+        }
     }
-}
 
-function handleZoomAutoStart(sender) {
-    const timestamp = new Date().toLocaleTimeString();
-    console.log(`🎬 Auto starting recording for Zoom at ${timestamp}`);
-    console.log("📍 Source tab:", sender.tab.id, sender.tab.url);
-    startRecordingForTab(sender.tab.id, 'zoom');
-    return { success: true };
-}
+    function handleZoomAutoStart(sender) {
+        const timestamp = new Date().toLocaleTimeString();
+        console.log(`🎬 Auto starting recording for Zoom at ${timestamp}`);
+        console.log("📍 Source tab:", sender.tab.id, sender.tab.url);
+        startRecordingForTab(sender.tab.id, 'zoom');
+        return { success: true };
+    }
 
-function notifyAllZoomTabs(enabled) {
-    chrome.tabs.query({url: ["https://*.zoom.us/*", "https://*.zoom.com/*"]}, (tabs) => {
-        tabs.forEach(tab => {
-            chrome.tabs.sendMessage(tab.id, {
-                action: "updateAutoRecordPermission",
-                enabled: enabled
+    function notifyAllZoomTabs(enabled) {
+        chrome.tabs.query({url: ["https://*.zoom.us/*", "https://*.zoom.com/*"]}, (tabs) => {
+            tabs.forEach(tab => {
+                chrome.tabs.sendMessage(tab.id, {
+                    action: "updateAutoRecordPermission",
+                    enabled: enabled
+                });
             });
         });
-    });
-}
+    }
 
     // ==================== COMMON FUNCTIONS ====================
     function startRecordingForTab(tabId, service) {
@@ -584,17 +584,17 @@ function notifyAllZoomTabs(enabled) {
                 }
 
                 if (message.action === "showZoomStatus" || message.action === "updateZoomTimer") {
-    chrome.tabs.query({ url: ["https://*.zoom.us/*", "https://*.zoom.com/*"] }, (tabs) => {
-        tabs.forEach(tab => {
-            chrome.tabs.sendMessage(tab.id, message, (response) => {
-                if (chrome.runtime.lastError) {
-                    console.log("⚠️ Could not send to Zoom tab:", tab.id, chrome.runtime.lastError.message);
+                    chrome.tabs.query({ url: ["https://*.zoom.us/*", "https://*.zoom.com/*"] }, (tabs) => {
+                        tabs.forEach(tab => {
+                            chrome.tabs.sendMessage(tab.id, message, (response) => {
+                                if (chrome.runtime.lastError) {
+                                    console.log("⚠️ Could not send to Zoom tab:", tab.id, chrome.runtime.lastError.message);
+                                }
+                            });
+                        });
+                    });
+                    return { success: true };
                 }
-            });
-        });
-    });
-    return { success: true };
-}
 
                 if (message.action === "recordingStarted") {
                     const timestamp = new Date().toLocaleTimeString();
