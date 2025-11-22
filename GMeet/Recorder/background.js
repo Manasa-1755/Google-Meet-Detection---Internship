@@ -22,44 +22,44 @@
     });
 
     async function restoreAutoRecordState() {
-    const result = await chrome.storage.local.get(['autoRecordPermissions']);
-    autoRecordPermissions = result.autoRecordPermissions || {};
-    console.log("🔧 Restored auto-record permissions:", autoRecordPermissions);
+        const result = await chrome.storage.local.get(['autoRecordPermissions']);
+        autoRecordPermissions = result.autoRecordPermissions || {};
+        console.log("🔧 Restored auto-record permissions:", autoRecordPermissions);
     
-    // Notify all tabs about the current permissions
-    notifyAllTabsOfPermissions();
-}
+        // Notify all tabs about the current permissions
+        notifyAllTabsOfPermissions();
+    }
 
-function notifyAllTabsOfPermissions() {
-    // Notify Google Meet tabs
-    chrome.tabs.query({ url: ["https://*.meet.google.com/*"] }, (tabs) => {
-        tabs.forEach(tab => {
-            chrome.tabs.sendMessage(tab.id, {
-                action: "updateAutoRecordPermission",
-                enabled: autoRecordPermissions['gmeet'] || false
-            }, (response) => {
-                if (chrome.runtime.lastError) {
-                    // Content script might not be ready yet, that's ok
-                }
+    function notifyAllTabsOfPermissions() {
+        // Notify Google Meet tabs
+        chrome.tabs.query({ url: ["https://*.meet.google.com/*"] }, (tabs) => {
+            tabs.forEach(tab => {
+                chrome.tabs.sendMessage(tab.id, {
+                    action: "updateAutoRecordPermission",
+                    enabled: autoRecordPermissions['gmeet'] || false
+                }, (response) => {
+                    if (chrome.runtime.lastError) {
+                        // Content script might not be ready yet, that's ok
+                    }
+                });
             });
         });
-    });
     
-    // Notify Teams tabs
-    chrome.tabs.query({ url: ["https://*.teams.microsoft.com/*", "https://*.teams.live.com/*"] }, (tabs) => {
-        tabs.forEach(tab => {
-            chrome.tabs.sendMessage(tab.id, {
-                action: "updateAutoRecordPermission",
-                enabled: autoRecordPermissions['teams'] || false            
+        // Notify Teams tabs
+        chrome.tabs.query({ url: ["https://*.teams.microsoft.com/*", "https://*.teams.live.com/*"] }, (tabs) => {
+            tabs.forEach(tab => {
+                chrome.tabs.sendMessage(tab.id, {
+                    action: "updateAutoRecordPermission",
+                    enabled: autoRecordPermissions['teams'] || false            
+                });
             });
         });
-    });
-}
+    }
 
-chrome.runtime.onStartup.addListener(() => {
-    console.log("🔄 Extension starting up - restoring auto-record state");
-    restoreAutoRecordState();
-});
+    chrome.runtime.onStartup.addListener(() => {
+        console.log("🔄 Extension starting up - restoring auto-record state");
+        restoreAutoRecordState();
+    });
 
     // Listen for tab updates
     chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -73,68 +73,67 @@ chrome.runtime.onStartup.addListener(() => {
         }
     });
 
-    // Add this function to background.js
-async function handlePermissionRecovery(tabId, service) {
-    console.log("🔄 Attempting permission recovery for tab:", tabId);
+    async function handlePermissionRecovery(tabId, service) {
+        console.log("🔄 Attempting permission recovery for tab:", tabId);
     
-    // Wait a bit for user to potentially interact with extension
-    await new Promise(resolve => setTimeout(resolve, 3000));
+        // Wait a bit for user to potentially interact with extension
+        await new Promise(resolve => setTimeout(resolve, 3000));
     
-    // Check if we can access the tab now
-    try {
-        const tab = await chrome.tabs.get(tabId);
-        if (tab) {
-            console.log("✅ Tab is accessible, retrying recording...");
+        // Check if we can access the tab now
+        try {
+            const tab = await chrome.tabs.get(tabId);
+            if (tab) {
+                console.log("✅ Tab is accessible, retrying recording...");
             
-            // Create new recorder tab
-            chrome.tabs.create({
-                url: chrome.runtime.getURL("recorder.html"),
-                active: false
-            }, (recorderTab) => {
-                console.log("✅ New recorder tab opened:", recorderTab.id);
-                
-                const startRecordingWithRetry = (retryCount = 0) => {
-                    console.log(`🔄 Retrying recording start (attempt ${retryCount + 1})...`);
+                // Create new recorder tab
+                chrome.tabs.create({
+                    url: chrome.runtime.getURL("recorder.html"),
+                    active: false
+                }, (recorderTab) => {
+                    console.log("✅ New recorder tab opened:", recorderTab.id);
                     
-                    chrome.tabs.sendMessage(recorderTab.id, { 
-                        action: "startRecording", 
-                        tabId: tabId,
-                        autoRecord: true,
-                        service: service
-                    }, (response) => {
-                        if (chrome.runtime.lastError) {
-                            console.log(`❌ Recorder tab not ready (attempt ${retryCount + 1}/3), retrying...`);
-                            if (retryCount < 2) {
-                                setTimeout(() => startRecordingWithRetry(retryCount + 1), 1000);
+                    const startRecordingWithRetry = (retryCount = 0) => {
+                        console.log(`🔄 Retrying recording start (attempt ${retryCount + 1})...`);
+                        
+                        chrome.tabs.sendMessage(recorderTab.id, { 
+                            action: "startRecording", 
+                            tabId: tabId,
+                            autoRecord: true,
+                            service: service
+                        }, (response) => {
+                            if (chrome.runtime.lastError) {
+                                console.log(`❌ Recorder tab not ready (attempt ${retryCount + 1}/3), retrying...`);
+                                if (retryCount < 2) {
+                                    setTimeout(() => startRecordingWithRetry(retryCount + 1), 1000);
+                                } else {
+                                    console.error("❌ Failed to start recording after 3 attempts");
+                                    chrome.tabs.remove(recorderTab.id);
+                                }
                             } else {
-                                console.error("❌ Failed to start recording after 3 attempts");
-                                chrome.tabs.remove(recorderTab.id);
+                                console.log("✅ Recording started successfully after permission recovery");
                             }
-                        } else {
-                            console.log("✅ Recording started successfully after permission recovery");
-                        }
-                    });
-                };
-                
-                setTimeout(() => startRecordingWithRetry(), 1500);
-            });
+                        });
+                    };
+                    
+                    setTimeout(() => startRecordingWithRetry(), 1500);
+                });
+            }
+        } catch (error) {
+            console.log("❌ Tab still not accessible:", error);
         }
-    } catch (error) {
-        console.log("❌ Tab still not accessible:", error);
     }
-}
 
     // ==================== GOOGLE MEET HANDLERS ====================
     async function handleGmeetTabUpdate(tabId, tab) {
-    console.log("✅ Meet tab detected:", tabId, tab.url);
+        console.log("✅ Meet tab detected:", tabId, tab.url);
     
-    // Check if auto-record is enabled for Google Meet
-    const result = await chrome.storage.local.get(['autoRecordPermissions']);
-    const gmeetAutoRecordEnabled = result.autoRecordPermissions?.['gmeet'] || false;
+        // Check if auto-record is enabled for Google Meet
+        const result = await chrome.storage.local.get(['autoRecordPermissions']);
+        const gmeetAutoRecordEnabled = result.autoRecordPermissions?.['gmeet'] || false;
     
-    if (gmeetAutoRecordEnabled) {
-        console.log("🎬 Auto record enabled for Google Meet - monitoring meeting state");
-    }
+        if (gmeetAutoRecordEnabled) {
+            console.log("🎬 Auto record enabled for Google Meet - monitoring meeting state");
+        }
     }
 
     function closeAllRecorderTabs() {
@@ -431,7 +430,7 @@ async function handlePermissionRecovery(tabId, service) {
                     });
     
                     return { success: true };
-            }
+                }
 
                 // Service-specific auto start
                 if (message.action === "autoStartRecording") {
@@ -502,18 +501,18 @@ async function handlePermissionRecovery(tabId, service) {
                 }
 
                 if (message.action === "showTeamsStatus" || message.action === "updateTeamsTimer") {
-    chrome.tabs.query({ url: ["https://*.teams.microsoft.com/*", "https://*.teams.live.com/*"] }, (tabs) => {
-        tabs.forEach(tab => {
-            // Send to ALL Teams tabs
-            chrome.tabs.sendMessage(tab.id, message, (response) => {
-                if (chrome.runtime.lastError) {
-                    console.log("⚠️ Could not send to Teams tab:", tab.id, chrome.runtime.lastError.message);
+                    chrome.tabs.query({ url: ["https://*.teams.microsoft.com/*", "https://*.teams.live.com/*"] }, (tabs) => {
+                        tabs.forEach(tab => {
+                            // Send to ALL Teams tabs
+                            chrome.tabs.sendMessage(tab.id, message, (response) => {
+                                if (chrome.runtime.lastError) {
+                                    console.log("⚠️ Could not send to Teams tab:", tab.id, chrome.runtime.lastError.message);
+                                }
+                            });
+                        });
+                    });
+                    return { success: true };
                 }
-            });
-        });
-    });
-    return { success: true };
-}
 
                 if (message.action === "recordingStarted") {
                     const timestamp = new Date().toLocaleTimeString();
@@ -576,14 +575,14 @@ async function handlePermissionRecovery(tabId, service) {
 
     // Handle extension installation
     chrome.runtime.onInstalled.addListener((details) => {
-    console.log("🔧 Extension installed/updated:", details.reason);
-    restoreAutoRecordState();
+        console.log("🔧 Extension installed/updated:", details.reason);
+        restoreAutoRecordState();
     
-    if (details.reason === 'install') {
-        chrome.storage.local.set({ autoRecordPermissions: {} });
-        console.log("🔐 Auto recording disabled by default for all services");
-    }
-});
+        if (details.reason === 'install') {
+            chrome.storage.local.set({ autoRecordPermissions: {} });
+            console.log("🔐 Auto recording disabled by default for all services");
+        }
+    });
 
     // Keep service worker alive
     setInterval(() => {
