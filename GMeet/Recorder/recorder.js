@@ -409,6 +409,8 @@
                     safeSetStatus("❌ Permission needed - please click extension icon once");
                     if (currentService === 'gmeet') {
                         broadcastToMeetTab("❌ Permission needed - please click extension icon once to grant access");
+                    } else if (currentService == 'teams') {
+                         broadcastToTeamsTab("❌ Permission needed - please click extension icon once to grant access");
                     }
                 
                     // For auto-record, we can retry after a delay
@@ -835,4 +837,5 @@
 
     console.log("🎬 Unified Recorder initialized for:", currentService);
 })();
+
 
