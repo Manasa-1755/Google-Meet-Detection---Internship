@@ -18,14 +18,53 @@
 
     console.log("🎬 Unified Recorder tab loaded");
 
-    // Service detection from URL parameters
+    // Service detection from URL parameters or message
     function detectService() {
         const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get('service') || 'gmeet'; // Default to gmeet
+        const serviceFromUrl = urlParams.get('service');
+    
+        if (serviceFromUrl === 'gmeet' || serviceFromUrl === 'teams' || serviceFromUrl == 'zoom') {
+            return serviceFromUrl;
+        }
+    
+        // Fallback: check the currentService variable that might be set from messages
+        if (currentService === 'gmeet' || currentService === 'teams' || currentService === 'zoom') {
+            return currentService;
+        }
+    
+        console.log("⚠️ No service detected, defaulting to gmeet");
+        return 'gmeet'; // Default to gmeet
+    }
+
+    function setupServiceBadge() {
+        const badge = document.getElementById('serviceBadge');
+        if (!badge) return;
+        
+        if (currentService === 'gmeet') {
+            badge.textContent = 'Google Meet';
+            badge.className = 'service-badge gmeet-badge';
+            document.title = 'Google Meet Recorder';
+            console.log("✅ Google Meet badge set");
+        } else if (currentService === 'teams') {
+            badge.textContent = 'Microsoft Teams';
+            badge.className = 'service-badge teams-badge';
+            document.title = 'Teams Recorder';
+            console.log("✅ Microsoft Teams badge set");            
+        } else if (currentService === 'zoom') {
+            badge.textContent = 'Zoom';
+            badge.className = 'service-badge zoom-badge';
+            document.title = 'Zoom Recorder';
+            console.log("✅ Zoom badge set");
+        } else {
+            badge.textContent = 'Meeting Recorder';
+            badge.className = 'service-badge';
+            document.title = 'Meeting Recorder';
+        }
     }
 
     // Initialize
     currentService = detectService();
+    setupServiceBadge();
     console.log(`🎬 Initializing recorder for: ${currentService}`);
 
     // ==================== COMMON FUNCTIONS ====================
@@ -38,8 +77,8 @@
 
     async function syncToggleState() {
         return new Promise((resolve) => {
-            chrome.storage.local.get(['autoRecordPermission'], (result) => {
-                autoRecordEnabled = result.autoRecordPermission || false;
+            chrome.storage.local.get(['autoRecordPermissions'], (result) => {
+                autoRecordEnabled = result.autoRecordPermissions || false;
                 console.log("🔄 Recorder: Auto record permission:", autoRecordEnabled);
                 updateToggleDisplay();
                 resolve(autoRecordEnabled);
@@ -99,6 +138,10 @@
             // Broadcast timer update for Google Meet
             if (currentService === 'gmeet') {
                 broadcastTimerUpdate(timeStr);
+            } else if (currentService === 'teams') {
+                broadcastTimerUpdateToTeams(timeStr);
+            } else if (currentService === 'zoom') {
+                broadcastTimerUpdateToZoom(timeStr);
             }
         }, 1000);
     }
@@ -115,6 +158,8 @@
             const message = isAutoRecord ? "❌ Auto Recording failed: No data" : "❌ Recording failed: No data";
             if (currentService === 'gmeet') {
                 broadcastToMeetTab(message);
+            } else if (currentService === 'zoom') {
+                broadcastToZoomTab(message);
             }
             return;
         }
@@ -129,6 +174,12 @@
         if (currentService === 'gmeet') {
             const stoppedMessage = isAutoRecord ? "🟡 Auto Recording Stopped" : "🟡 Recording Stopped";
             broadcastToMeetTab(stoppedMessage);
+        } else if (currentService === 'teams') {
+            const stoppedMessage = isAutoRecord ? "🟡 Auto Recording Stopped" : "🟡 Recording Stopped";
+            broadcastToTeamsTab(stoppedMessage);
+        } else if (currentService === 'zoom') {
+            const stoppedMessage = isAutoRecord ? "🟡 Auto Recording Stopped" : "🟡 Recording Stopped";
+            broadcastToZoomTab(stoppedMessage);
         }
 
         chrome.downloads.download({ url, filename, saveAs: false }, (downloadId) => {
@@ -148,6 +199,10 @@
             const downloadedMessage = isAutoRecord ? "✅ Auto Recording Downloaded" : "✅ Recording Downloaded";
             if (currentService === 'gmeet') {
                 broadcastToMeetTab(downloadedMessage);
+            } else if (currentService === 'teams') {
+                broadcastToTeamsTab(downloadedMessage);
+            } else if (currentService === 'zoom') {
+                broadcastToZoomTab(downloadedMessage);
             }
             
             chrome.runtime.sendMessage({ action: "recordingCompleted" });
@@ -292,15 +347,27 @@
                 safeSetStatus("🟡 Auto recording starting...");
                 if (currentService === 'gmeet') {
                     broadcastToMeetTab("🟡 Auto recording starting...");
+                }  else if (currentService === 'zoom') {
+                    broadcastToZoomTab("🟡 Auto recording starting...");
                 }
             } else {
                 safeSetStatus("🟡 Starting recording...");
                 if (currentService === 'gmeet') {
                     broadcastToMeetTab("🟡 Starting recording...");
+                } else if (currentService === 'zoom') {
+                   broadcastToZoomTab("🟡 Starting recording...");
                 }
             }
             
             await new Promise(resolve => setTimeout(resolve, 1000));
+
+            // First, try to activate the tab to get permissions
+            try {
+                await chrome.tabs.update(tabId, { active: true });
+                await new Promise(resolve => setTimeout(resolve, 500));
+            } catch (e) {
+                console.log("⚠️ Could not activate tab:", e.message);
+            }
 
             const tab = await new Promise((resolve, reject) => {
                 chrome.tabs.get(tabId, (tab) => {
@@ -316,37 +383,68 @@
 
             console.log("✅ Source tab validated:", tab.url);
 
-            const tabStream = await new Promise((resolve, reject) => {
-                chrome.tabCapture.capture({
-                    audio: true,
-                    video: true,
-                    audioConstraints: {
-                        mandatory: {
-                            chromeMediaSource: 'tab',
-                            chromeMediaSourceId: tabId.toString(), 
+            // Try tab capture with error handling
+            let tabStream;
+            try {
+                tabStream = await new Promise((resolve, reject) => {
+                    chrome.tabCapture.capture({
+                        audio: true,
+                        video: true,
+                        audioConstraints: {
+                            mandatory: {
+                                chromeMediaSource: 'tab',
+                                chromeMediaSourceId: tabId.toString(), 
+                            }
+                        },
+                        videoConstraints: {
+                            mandatory: {
+                                chromeMediaSource: 'tab',
+                                chromeMediaSourceId: tabId.toString(), 
+                                minWidth: 1280,
+                                minHeight: 720,
+                                maxWidth: 1920,
+                                maxHeight: 1080,
+                                maxFrameRate: 30
+                            }
                         }
-                    },
-                    videoConstraints: {
-                        mandatory: {
-                            chromeMediaSource: 'tab',
-                            chromeMediaSourceId: tabId.toString(), 
-                            minWidth: 1280,
-                            minHeight: 720,
-                            maxWidth: 1920,
-                            maxHeight: 1080,
-                            maxFrameRate: 30
+                    }, (stream) => {
+                        if (chrome.runtime.lastError) {
+                            reject(new Error(`Tab capture failed: ${chrome.runtime.lastError.message}`));
+                        } else if (!stream) {
+                            reject(new Error("No tab stream returned - check activeTab permission"));
+                        } else {
+                            resolve(stream);
                         }
-                    }
-                }, (stream) => {
-                    if (chrome.runtime.lastError) {
-                        reject(new Error(`Tab capture failed: ${chrome.runtime.lastError.message}`));
-                    } else if (!stream) {
-                        reject(new Error("No tab stream returned - check activeTab permission"));
-                    } else {
-                        resolve(stream);
-                    }
+                    });
                 });
-            });
+            } catch (captureError) {
+                console.error("❌ Tab capture failed:", captureError);
+            
+                // If it's a permission error, show user-friendly message
+                if (captureError.message.includes('not been invoked') || 
+                    captureError.message.includes('permission')) {
+                        
+                    safeSetStatus("❌ Permission needed - please click extension icon once");
+                    if (currentService === 'gmeet') {
+                        broadcastToMeetTab("❌ Permission needed - please click extension icon once to grant access");
+                    } else if (currentService == 'teams') {
+                         broadcastToTeamsTab("❌ Permission needed - please click extension icon once to grant access");
+                    }
+                
+                    // For auto-record, we can retry after a delay
+                    if (isAutoRecord) {
+                        console.log("🔄 Auto-record: Will retry after permission grant");
+                        setTimeout(() => {
+                            if (!isRecording) {
+                                console.log("🔄 Auto-record: Retrying recording...");
+                                startRecording(tabId);
+                            }
+                        }, 5000);
+                    }
+                    return;
+                }
+                throw captureError;
+            }
 
             console.log("✅ Tab stream captured. Audio tracks:", tabStream.getAudioTracks().length, 
                         "Video tracks:", tabStream.getVideoTracks().length);
@@ -354,16 +452,19 @@
             // Audio setup for Google Meet (with microphone mixing)
             if (currentService === 'gmeet') {
                 await setupGmeetAudio(tabStream, tabId);
-            } else {
-                // Teams audio setup (simpler)
+            } else if (currentService === 'teams') {
                 await setupTeamsAudio(tabStream);
+            } else if (currentService == 'zoom') {
+                await setupZoomAudio(tabStream);
             }
 
         } catch (err) {
             console.error("❌ Recording start failed:", err);
             safeSetStatus("❌ Recording failed: " + err.message);
             if (currentService === 'gmeet') {
-                broadcastToMeetTab("❌ Recording failed. \nTry clicking the Reset button in UI to restart auto-recording.");
+                broadcastToMeetTab("❌ Recording failed.\n");
+            } else if (currentService === 'zoom') {
+                broadcastToZoomTab("❌ Recording failed. \nTry clicking the Reset button in UI to restart auto-recording.");
             }
             cleanup();
         }
@@ -552,6 +653,18 @@
                 } else {
                     broadcastToMeetTab("🟡 Recording Stopped");
                 }
+            } else if (currentService === 'teams') {
+                if (isAutoRecord) {
+                    broadcastToTeamsTab("🟡 Auto Recording Stopped");
+                } else {
+                    broadcastToTeamsTab("🟡 Recording Stopped");
+                }
+            } else if (currentService === 'zoom') {
+                if (isAutoRecord) {
+                    broadcastToZoomTab("🟡 Auto Recording Stopped");
+                } else {
+                    broadcastToZoomTab("🟡 Recording Stopped");
+                }
             }
 
             if (recordedChunks.length > 0) {
@@ -591,6 +704,18 @@
             } else {
                 broadcastToMeetTab("🔴 Recording Started");
             }
+        } else if (currentService === 'teams') {
+            if (isAutoRecord) {
+                broadcastToTeamsTab("🔴 Auto Recording Started");
+            } else {
+                broadcastToTeamsTab("🔴 Recording Started");
+            }
+        } else if (currentService === 'zoom') {
+            if (isAutoRecord) {
+                broadcastToZoomTab("🔴 Auto Recording Started");
+            } else {
+                broadcastToZoomTab("🔴 Recording Started");
+            }
         }
     }
 
@@ -606,6 +731,84 @@
         }
     }
 
+    // ==================== TEAMS SPECIFIC ====================    
+    function broadcastToTeamsTab(message, duration = 4000) {
+        chrome.runtime.sendMessage({
+            action: "showTeamsStatus", 
+            message: message,
+            duration: duration
+        });
+    }
+
+    function broadcastTimerUpdateToTeams(timeStr) {
+        chrome.runtime.sendMessage({
+            action: "updateTeamsTimer",
+            time: timeStr
+        });
+    }
+
+    // ==================== ZOOM SPECIFIC ====================
+function broadcastToZoomTab(message, duration = 4000) {
+    chrome.runtime.sendMessage({
+        action: "showZoomStatus", 
+        message: message,
+        duration: duration
+    });
+}
+
+function broadcastTimerUpdateToZoom(timeStr) {
+    chrome.runtime.sendMessage({
+        action: "updateZoomTimer",
+        time: timeStr
+    });
+}
+
+async function setupZoomAudio(tabStream) {
+    let finalStream = tabStream;
+
+    // Try to add microphone audio for Zoom
+    try {
+        console.log("🎤 Attempting to capture microphone for Zoom...");
+        const micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                sampleRate: 44100,
+                channelCount: 2
+            },
+            video: false
+        });
+
+        console.log("✅ Microphone captured for Zoom");
+
+        const audioContext = new AudioContext({ sampleRate: 44100 });
+        const destination = audioContext.createMediaStreamDestination();
+
+        const tabAudioSource = audioContext.createMediaStreamSource(
+            new MediaStream(tabStream.getAudioTracks())
+        );
+        const micAudioSource = audioContext.createMediaStreamSource(micStream);
+
+        tabAudioSource.connect(destination);
+        micAudioSource.connect(destination);
+
+        finalStream = new MediaStream([
+            ...tabStream.getVideoTracks(),
+            ...destination.stream.getAudioTracks()
+        ]);
+
+        originalAudioContext = audioContext;
+        console.log("✅ Audio mixed successfully for Zoom");
+
+    } catch (micError) {
+        console.warn("⚠️ Microphone not available for Zoom, using tab audio only:", micError);
+        finalStream = tabStream;
+    }
+
+    setupMediaRecorder(finalStream, finalStream, originalAudioContext);
+}
+
     // ==================== MESSAGE LISTENER ====================
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         console.log("📨 Recorder received:", message.action);
@@ -617,6 +820,7 @@
                     currentTabId = message.tabId;
                     currentService = message.service || 'gmeet';
                     console.log("🎬 Starting recording, service:", currentService, "auto mode:", isAutoRecord, "tabId:", currentTabId);
+                    setupServiceBadge();
                     await startRecording(message.tabId);
                     return { success: true };
                 }
@@ -653,76 +857,73 @@
     
     let userConfirmedLeave = false;
 
-window.addEventListener('beforeunload', (event) => {
-    if (isRecording && recordedChunks.length > 0) {
-        if (isAutoRecord) {
-            console.log("🤖 Auto-record: Closing recorder tab - auto-downloading recording");
-            // For auto-record: proceed with download
-            if (mediaRecorder && mediaRecorder.state === 'recording') {
-                mediaRecorder.stop();
+    window.addEventListener('beforeunload', (event) => {
+        if (isRecording && recordedChunks.length > 0) {
+            if (isAutoRecord) {
+                console.log("🤖 Auto-record: Closing recorder tab - auto-downloading recording");
+                // For auto-record: proceed with download
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    mediaRecorder.stop();
+                }    
+            
+                setTimeout(() => {
+                    downloadRecording();
+                }, 500);
+            
+                return '';
+            } else {
+                // For manual recording: Show warning and wait for user decision
+                console.log("🚨 Manual recording: Recorder tab closing warning");
+                event.preventDefault();
+                event.returnValue = 'Recording is in progress. Are you sure you want to leave?';
+            
+                // Set a flag to track user decision
+                setTimeout(() => {
+                    // If we're still here after a short delay, user clicked "Cancel"
+                    userConfirmedLeave = false;
+                    console.log("✅ User clicked Cancel - continuing recording");
+                }, 100);
+            
+                return event.returnValue;
             }
-            
-            event.preventDefault();
-            event.returnValue = '';
-            
-            setTimeout(() => {
-                downloadRecording();
-            }, 500);
-            
-            return '';
-        } else {
-            // For manual recording: Show warning and wait for user decision
-            console.log("🚨 Manual recording: Recorder tab closing warning");
-            event.preventDefault();
-            event.returnValue = 'Recording is in progress. Are you sure you want to leave?';
-            
-            // Set a flag to track user decision
-            setTimeout(() => {
-                // If we're still here after a short delay, user clicked "Cancel"
-                userConfirmedLeave = false;
-                console.log("✅ User clicked Cancel - continuing recording");
-            }, 100);
-            
-            return event.returnValue;
         }
-    }
-});
+    });
 
-window.addEventListener('unload', () => {
-    // This only runs when user actually leaves the page
-    if (isRecording && recordedChunks.length > 0) {
-        console.log(`🚨 Tab closing - saving recording (Auto: ${isAutoRecord})`);
+    window.addEventListener('unload', () => {
+        // This only runs when user actually leaves the page
+        if (isRecording && recordedChunks.length > 0) {
+            console.log(`🚨 Tab closing - saving recording (Auto: ${isAutoRecord})`);
         
-        if (recordedChunks.length > 0) {
-            console.log("💾 Immediately downloading recording data before tab closes");
+            if (recordedChunks.length > 0) {
+                console.log("💾 Immediately downloading recording data before tab closes");
             
-            // Use synchronous download approach
-            const blob = new Blob(recordedChunks, { type: 'video/webm' });
-            const url = URL.createObjectURL(blob);
-            const timestamp = new Date().toISOString().replace(/[:.]/g,'-').replace('T','_').split('Z')[0];
-            const filename = `${currentService}-recording-${timestamp}.webm`;
+                // Use synchronous download approach
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const timestamp = new Date().toISOString().replace(/[:.]/g,'-').replace('T','_').split('Z')[0];
+                const filename = `${currentService}-recording-${timestamp}.webm`;
             
-            // Create and trigger download immediately
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+                // Create and trigger download immediately
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = filename;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
             
-            // Send completion message
-            chrome.runtime.sendMessage({ action: "recordingCompleted" });
-            
-            console.log("✅ Recording downloaded before tab close");
-        }
+                // Send completion message
+                chrome.runtime.sendMessage({ action: "recordingCompleted" });
+                
+                console.log("✅ Recording downloaded before tab close");
+            }
 
-        // User confirmed they want to leave - save the recording
-        if (mediaRecorder && mediaRecorder.state === 'recording') {
-            console.log("🛑 Stopping media recorder for download");
-            mediaRecorder.stop();
-        } 
-    }
-});
+            // User confirmed they want to leave - save the recording
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                console.log("🛑 Stopping media recorder for download");
+                mediaRecorder.stop();
+            } 
+        }
+    });
 
     // Keep tab alive
     setInterval(() => { 
@@ -731,3 +932,4 @@ window.addEventListener('unload', () => {
 
     console.log("🎬 Unified Recorder initialized for:", currentService);
 })();
+

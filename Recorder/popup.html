@@ -204,8 +204,75 @@
     .teams-theme {
       background: linear-gradient(135deg, #464EB8 0%, #2B3178 100%);
     }
+    .zoom-theme {
+      background: linear-gradient(135deg, #3A506B 0%, #1C2541 100%);
+    }
     .default-theme {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    /* Service Selector */
+    .service-selector {
+      background: rgba(255,255,255,0.1);
+      border-radius: 12px;
+      padding: 16px;
+      margin: 16px 0;
+      text-align: center;
+      border: 1px solid rgba(255,255,255,0.2);
+      backdrop-filter: blur(10px);
+    }
+    .service-selector > div:first-child {
+      font-size: 16px;
+      font-weight: bold;
+      margin-bottom: 12px;
+      color: #fff;
+    }
+    .service-options {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .service-option {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      padding: 12px 8px;
+      border-radius: 10px;
+      transition: all 0.3s ease;
+      background: rgba(255,255,255,0.1);
+      border: 2px solid transparent;
+      flex: 1;
+      min-width: 0;
+      backdrop-filter: blur(5px);
+    }
+    .service-option:hover {
+      background: rgba(255,255,255,0.15);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .service-option.active {
+      background: rgba(255,255,255,0.25);
+      border: 2px solid rgba(255,255,255,0.5);
+      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+      transform: translateY(-1px);
+    }
+    .service-option input {
+      margin: 0;
+      width: 16px;
+      height: 16px;
+      accent-color: #4CAF50;
+    }
+    .service-icon {
+      font-size: 18px;
+    }
+    .service-option span:last-child {
+      font-size: 12px;
+      font-weight: 600;
+      text-align: center;;
+      line-height: 1.2;
     }
   </style>
 </head>
@@ -213,12 +280,29 @@
   <div class="container">
     <div class="header">
       <h2>🎬 Meeting Recorder</h2>
-      <div class="subtitle">Record Google Meet & Microsoft Teams</div>
+      <div class="subtitle">Record Google Meet, Microsoft Teams & Zoom</div>
     </div>
     
-    <!-- Service Indicator -->
-    <div class="service-indicator" id="serviceIndicator">
-      🔍 Detecting service...
+    <!-- Service Selection -->
+    <div class="service-selector">
+      <div>Select Meeting Service</div>
+      <div class="service-options">
+        <label class="service-option" id="gmeetOption">
+          <input type="radio" name="service" value="gmeet">
+          <span class="service-icon">📹</span>
+          <span>Google Meet</span>
+        </label>
+        <label class="service-option" id="teamsOption">
+          <input type="radio" name="service" value="teams">
+          <span class="service-icon">💼</span>
+          <span>Microsoft Teams</span>
+        </label>
+        <label class="service-option" id="zoomOption">
+          <input type="radio" name="service" value="zoom">
+          <span class="service-icon">🎥</span>
+          <span>Zoom</span>
+        </label>
+      </div>
     </div>
     
     <!-- Features Section (Shown on other websites) -->
@@ -231,14 +315,14 @@
           • Auto-record when joining meetings<br>
           • Automatic download when meeting ends<br>                    
           • Background recording - popup can be closed<br>                    
-          • Works with Google Meet & Microsoft Teams
+          • Works with Google Meet, Microsoft Teams & Zoom
         </div>
       </div>
       
       <div class="feature-card">
         <div class="feature-title">💡 How to use:</div>
         <div class="feature-list">
-          1. Open Google Meet or Teams meeting<br>
+          1. Open Google Meet or Teams meeting or Zoom<br>
           2. Enable Auto-Record in settings<br>
           3. Join meeting - recording starts automatically!
         </div>
@@ -282,6 +366,9 @@
       </div>
       <div class="important-note" id="teamsNote" style="display: none;">
         🔊 Records: Teams Audio + Your Microphone
+      </div>
+      <div class="important-note" id="zoomNote" style="display: none;">
+        🔊 Records: Zoom Audio + Your Microphone
       </div>
     </div>
     
