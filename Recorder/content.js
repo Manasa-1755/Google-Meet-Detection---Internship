@@ -1,5 +1,5 @@
 
-// UNIFIED CONTENT.JS - Google Meet & Microsoft Teams
+// UNIFIED CONTENT.JS - Google Meet, Microsoft Teams & Zoom
 (function() {
     'use strict';
 
@@ -566,6 +566,13 @@
             await initializeWithStateRecovery();
             await initializeAutoRecord();
             console.log("🔍 Meet Auto Recorder content script fully loaded with state recovery");
+    
+            // Show initial status based on auto-record setting
+            if (autoRecordEnabled) {
+                showMeetStatus("✅ Google Meet's Auto Recording Enabled", 3000);
+            } else {
+                showMeetStatus("✅ Google Meet's Manual Recorder Is Ready", 3000);
+            }
         }, 1000);
     }
 
@@ -1202,6 +1209,13 @@
             checkAutoRecordPermission().then(() => {
                 console.log("🔐 Teams auto-record permission loaded:", autoRecordEnabled);
 
+                // Show initial status based on auto-record setting
+                if (autoRecordEnabled) {
+                    showTeamsStatus("✅ Teams Auto Recording Enabled", 3000);
+                } else {
+                    showTeamsStatus("✅ Teams Recorder Ready - Manual mode", 3000);
+                }
+
                 initializeAutoRecord();
             
                 // Then check meeting status
@@ -1361,6 +1375,66 @@
         let recordingStarted = false;
         let autoRecordEnabled = false;
         let meetingStartTimeout = null;
+
+// ==================== ZOOM STATUS FUNCTIONS ====================
+function showZoomStatus(message, duration = 4000) {
+    const existing = document.getElementById('zoom-recorder-status');
+    
+    if (existing && message.includes("Recording...")) {
+        existing.innerHTML = message.replace(/\n/g, '<br>');
+        return;
+    }
+    
+    if (existing) existing.remove();
+    
+    const status = document.createElement('div');
+    status.id = 'zoom-recorder-status';
+    status.innerHTML = message.replace(/\n/g, '<br>');
+    status.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        background: rgba(0,0,0,0.95);
+        color: white;
+        padding: 12px 16px;
+        border-radius: 10px;
+        font-family: 'Segoe UI', Arial, sans-serif;
+        font-size: 14px;
+        z-index: 100000;
+        font-weight: bold;
+        border: 2px solid #2D8CFF;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        backdrop-filter: blur(10px);
+        max-width: 400px;
+        word-wrap: break-word;
+    `;
+    
+    document.body.appendChild(status);
+
+    if (!message.includes("Recording...")) {
+        setTimeout(() => {
+            const currentStatus = document.getElementById('zoom-recorder-status');
+            if (currentStatus && !currentStatus.innerHTML.includes("Recording...")) {
+                currentStatus.remove();
+            }
+        }, duration);
+    }
+}
+
+function broadcastTimerUpdateToZoom(timeStr) {
+    chrome.runtime.sendMessage({
+        action: "updateZoomTimer",
+        time: timeStr
+    });
+}
+
+function broadcastToZoomTab(message, duration = 4000) {
+    chrome.runtime.sendMessage({
+        action: "showZoomStatus", 
+        message: message,
+        duration: duration
+    });
+}
 
         // Check auto record permission on load
         checkAutoRecordPermission();
@@ -1576,7 +1650,14 @@
             if (recordingStarted) {
                 console.log("🚨 ZOOM NUCLEAR: Stopping active recording");
                 recordingStarted = false;
-                
+
+                // Show appropriate status based on recording mode
+                if (autoRecordEnabled) {
+                    showZoomStatus("🟡 Auto Recording Stopped - Meeting ended");
+                } else {
+                    showZoomStatus("🟡 Recording Stopped - Meeting ended");
+                }
+
                 // Hide UI immediately
                 hideRecordingPopup();
                 hideRecordingTimer();
@@ -1640,6 +1721,13 @@
             
             console.log("⏰ Zoom: Starting 3-second delay before recording...");
             
+            // Only show auto-recording message if auto-record is enabled
+            if (autoRecordEnabled) {
+                showZoomStatus("🟡 Auto recording starting in 3 seconds...");
+            } else {
+                showZoomStatus("🟡 Meeting detected - ready to record");
+            }
+            
             meetingStartTimeout = setTimeout(() => {
                 console.log("⏰ Zoom: 3-second delay completed - starting meeting");
                 meetingStarted();
@@ -1648,15 +1736,19 @@
 
         function meetingStarted() {
             if (isInMeeting) return;
-            
+    
             console.log("🎯 ZOOM MEETING STARTED");
             isInMeeting = true;
-            
+    
+            // Only show auto-recording status if auto-record is enabled
             if (autoRecordEnabled && !recordingStarted) {
                 console.log("🎬 ZOOM AUTO RECORDING STARTING");
                 startAutoRecording();
+            } else if (!autoRecordEnabled) {
+                // Show different status for manual recording availability
+                showZoomStatus("✅ In Zoom meeting - Ready for manual recording", 5000);
             }
-            
+    
             showMeetingNotification("started");
             chrome.storage.local.set({ isInMeeting: isInMeeting });
         }
@@ -1672,6 +1764,13 @@
             
             showRecordingPopup();
             
+            // Only show auto-recording status if auto-record is enabled
+            if (autoRecordEnabled) {
+                showZoomStatus("🔴 Auto Recording Started");
+            } else {
+                showZoomStatus("🔴 Recording Started");
+            }
+
             chrome.runtime.sendMessage({ 
                 action: "autoStartRecording",
                 service: 'zoom'
@@ -1683,6 +1782,7 @@
                     console.log("❌ Zoom: Recording failed to start");
                     recordingStarted = false;
                     hideRecordingPopup();
+                    showZoomStatus("❌ Auto Recording Failed");
                 }
             });
         }
@@ -1694,6 +1794,13 @@
             }
             
             console.log("🛑 Zoom: Stopping recording and downloading...");
+            
+            // Show appropriate status based on recording mode
+            if (autoRecordEnabled) {
+                showZoomStatus("🟡 Auto Recording Stopped - Downloading...");
+            } else {
+                showZoomStatus("🟡 Recording Stopped - Downloading...");
+            }
             
             // CLEAN UP ALL UI ELEMENTS
             hideRecordingPopup();
@@ -1707,6 +1814,11 @@
                 } else {
                     console.log("❌ Zoom: Recording failed to stop");
                     recordingStarted = false;
+                    if (autoRecordEnabled) {
+                        showZoomStatus("❌ Auto Recording Stop Failed");
+                    } else {
+                        showZoomStatus("❌ Recording Stop Failed");
+                    }
                 }
             });
         }
@@ -1838,26 +1950,55 @@
             if (message.action === "updateAutoRecordPermission") {
                 autoRecordEnabled = message.enabled;
                 console.log("🔐 Zoom: Auto record permission updated:", autoRecordEnabled);
+                
+                // Show appropriate status when permission changes
+                if (autoRecordEnabled) {
+                    showZoomStatus("✅ Auto Recording Enabled for Zoom", 4000);
+                } else {
+                    showZoomStatus("✅ Auto Recording Disabled for Zoom", 4000);
+                }
+    
+                sendResponse({ success: true });
+            }
+
+            if (message.action === "showZoomStatus") {
+                const duration = message.duration || 4000;
+                showZoomStatus(message.message, duration);
+                sendResponse({ success: true });
+            }
+
+            if (message.action === "updateZoomTimer") {
+                const status = document.getElementById('zoom-recorder-status');
+                if (status && status.textContent.includes('Recording')) {
+                    status.textContent = `🔴 Recording... ${message.time}`;
+                } else if (isInMeeting && recordingStarted) {
+                    showZoomStatus(`🔴 Recording... ${message.time}`);
+                }
                 sendResponse({ success: true });
             }
 
             if (message.action === "autoRecordToggledOn") {
                 autoRecordEnabled = message.enabled;
                 console.log("🔄 Zoom: Auto-record toggled ON, checking meeting status...");
-                
+    
                 // Check if we're in a meeting and start recording immediately
                 setTimeout(() => {
                     const meetingDetected = document.querySelector('.video-container') || 
-                                           document.querySelector('.zm-btn.join-audio-by-voip__join-btn');
+                               document.querySelector('.zm-btn.join-audio-by-voip__join-btn');
                     if (meetingDetected && !isInMeeting) {
                         console.log("🚀 Zoom: Meeting detected with auto-record enabled - starting recording");
+                        showZoomStatus("🟡 Auto recording starting in 3 seconds...");
                         startMeetingWithDelay();
                     } else if (isInMeeting && !recordingStarted) {
                         console.log("🚀 Zoom: Already in meeting with auto-record enabled - starting recording");
+                        showZoomStatus("🟡 Auto recording starting now...");
                         startAutoRecording();
+                    } else if (isInMeeting && !autoRecordEnabled) {
+                        // If we're in meeting but auto-record is disabled, show ready status
+                        showZoomStatus("✅ In Zoom meeting - Ready for manual recording");
                     }
                 }, 500);
-                
+
                 sendResponse({ success: true });
             }
 
@@ -1888,12 +2029,14 @@
                 console.log("🎬 Zoom: Manual recording started");
                 recordingStarted = true;
                 showRecordingPopup();
+                showZoomStatus("🔴 Recording Started");                
                 sendResponse({ success: true });
             }
 
             if (message.action === "manualRecordingStopped") {
                 console.log("🛑 Zoom: Manual recording stopped");
                 recordingStarted = false;
+                showZoomStatus("🟡 Recording Stopped - Downloading...");                
                 hideRecordingPopup();
                 sendResponse({ success: true });
             }
@@ -1901,8 +2044,15 @@
             if (message.action === "recordingCompleted") {
                 recordingStarted = false;
                 if (autoRecordEnabled) {
-                    showRecordingNotification("stopped");
+                    showZoomStatus("✅ Auto Recording Completed & Downloaded");
+                } else {
+                    showZoomStatus("✅ Recording Completed & Downloaded");
                 }
+                sendResponse({ success: true });
+            }
+
+            if (message.action === "showPermissionError") {
+                showZoomStatus("❌ Permission needed - please click extension icon once to grant access", 6000);
                 sendResponse({ success: true });
             }
             
@@ -1924,6 +2074,15 @@
             startMeetingDetection();
             setupEndButtonDetection();
             console.log("✅ Zoom Auto Recorder initialized");
+    
+            // Show initial status based on auto-record setting
+            checkAutoRecordPermission().then((enabled) => {
+                if (enabled) {
+                    showZoomStatus("✅ Zoom Auto Recording Enabled", 3000);
+                } else {
+                    showZoomStatus("✅ Zoom Recorder Ready - Manual mode", 3000);
+                }
+            });
         }, 1000);
 
         console.log("🔍 Zoom Auto Recorder content script loaded");
