@@ -1,4 +1,5 @@
-// UNIFIED RECORDER.JS - Google Meet & Microsoft Teams
+// UNIFIED RECORDER.JS - Google Meet, Microsoft Teams & Zoom
+
 (function() {
     'use strict';
 
@@ -429,6 +430,8 @@
                         broadcastToMeetTab("❌ Permission needed - please click extension icon once to grant access");
                     } else if (currentService == 'teams') {
                          broadcastToTeamsTab("❌ Permission needed - please click extension icon once to grant access");
+                    } else if (currentService === 'zoom') {
+                        broadcastToZoomTab("❌ Permission needed - please click extension icon once to grant access");
                     }
                 
                     // For auto-record, we can retry after a delay
