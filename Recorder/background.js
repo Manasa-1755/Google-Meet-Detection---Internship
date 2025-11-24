@@ -1,5 +1,6 @@
 
-// UNIFIED BACKGROUND.JS - Google Meet & Microsoft Teams
+// UNIFIED BACKGROUND.JS - Google Meet, Microsoft Teams & Zoom
+
 (function() {
     'use strict';
 
