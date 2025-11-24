@@ -1,5 +1,6 @@
 
 // UNIFIED CONTENT.JS - Google Meet, Microsoft Teams & Zoom
+
 (function() {
     'use strict';
 
@@ -569,7 +570,7 @@
     
             // Show initial status based on auto-record setting
             if (autoRecordEnabled) {
-                showMeetStatus("✅ Google Meet's Auto Recording Enabled", 3000);
+                showMeetStatus("✅ Google Meet's Auto Recording Enabled \nPermission needed - please click the extension icon once to grant access", 3000);
             } else {
                 showMeetStatus("✅ Google Meet's Manual Recorder Is Ready", 3000);
             }
@@ -1211,7 +1212,7 @@
 
                 // Show initial status based on auto-record setting
                 if (autoRecordEnabled) {
-                    showTeamsStatus("✅ Teams Auto Recording Enabled", 3000);
+                    showTeamsStatus("✅ Teams Auto Recording Enabled \nPermission needed - please click the extension icon once to grant access", 3000);
                 } else {
                     showTeamsStatus("✅ Teams Recorder Ready - Manual mode", 3000);
                 }
@@ -1376,204 +1377,204 @@
         let autoRecordEnabled = false;
         let meetingStartTimeout = null;
 
-// ==================== ZOOM STATUS FUNCTIONS ====================
-function showZoomStatus(message, duration = 4000) {
-    const existing = document.getElementById('zoom-recorder-status');
+    // ==================== ZOOM STATUS FUNCTIONS ====================
+    function showZoomStatus(message, duration = 4000) {
+        const existing = document.getElementById('zoom-recorder-status');
     
-    if (existing && message.includes("Recording...")) {
-        existing.innerHTML = message.replace(/\n/g, '<br>');
-        return;
+        if (existing && message.includes("Recording...")) {
+            existing.innerHTML = message.replace(/\n/g, '<br>');
+            return;
+        }
+    
+        if (existing) existing.remove();
+    
+        const status = document.createElement('div');
+        status.id = 'zoom-recorder-status';
+        status.innerHTML = message.replace(/\n/g, '<br>');
+        status.style.cssText = `
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: rgba(0,0,0,0.95);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 14px;
+            z-index: 100000;
+            font-weight: bold;
+            border: 2px solid #2D8CFF;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            max-width: 400px;
+            word-wrap: break-word;
+        `;
+    
+        document.body.appendChild(status);
+
+        if (!message.includes("Recording...")) {
+            setTimeout(() => {
+                const currentStatus = document.getElementById('zoom-recorder-status');
+                if (currentStatus && !currentStatus.innerHTML.includes("Recording...")) {
+                    currentStatus.remove();
+                }
+            }, duration);
+        }
     }
-    
-    if (existing) existing.remove();
-    
-    const status = document.createElement('div');
-    status.id = 'zoom-recorder-status';
-    status.innerHTML = message.replace(/\n/g, '<br>');
-    status.style.cssText = `
-        position: fixed;
-        top: 80px;
-        right: 20px;
-        background: rgba(0,0,0,0.95);
-        color: white;
-        padding: 12px 16px;
-        border-radius: 10px;
-        font-family: 'Segoe UI', Arial, sans-serif;
-        font-size: 14px;
-        z-index: 100000;
-        font-weight: bold;
-        border: 2px solid #2D8CFF;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        backdrop-filter: blur(10px);
-        max-width: 400px;
-        word-wrap: break-word;
-    `;
-    
-    document.body.appendChild(status);
 
-    if (!message.includes("Recording...")) {
-        setTimeout(() => {
-            const currentStatus = document.getElementById('zoom-recorder-status');
-            if (currentStatus && !currentStatus.innerHTML.includes("Recording...")) {
-                currentStatus.remove();
-            }
-        }, duration);
+    function broadcastTimerUpdateToZoom(timeStr) {
+        chrome.runtime.sendMessage({
+            action: "updateZoomTimer",
+            time: timeStr
+        });
     }
-}
 
-function broadcastTimerUpdateToZoom(timeStr) {
-    chrome.runtime.sendMessage({
-        action: "updateZoomTimer",
-        time: timeStr
-    });
-}
+    function broadcastToZoomTab(message, duration = 4000) {
+        chrome.runtime.sendMessage({
+            action: "showZoomStatus", 
+            message: message,
+            duration: duration
+        });
+    }
 
-function broadcastToZoomTab(message, duration = 4000) {
-    chrome.runtime.sendMessage({
-        action: "showZoomStatus", 
-        message: message,
-        duration: duration
-    });
-}
+    // Check auto record permission on load
+    checkAutoRecordPermission();
 
-        // Check auto record permission on load
-        checkAutoRecordPermission();
-
-        async function checkAutoRecordPermission() {
-            return new Promise((resolve) => {
-                chrome.storage.local.get(['autoRecordPermissions'], (result) => {
-                    // Get service-specific permission for Zoom
-                    autoRecordEnabled = result.autoRecordPermissions?.['zoom'] || false;
-                    console.log("🔐 Auto record enabled for zoom:", autoRecordEnabled);
-                    resolve(autoRecordEnabled);
-                });
+    async function checkAutoRecordPermission() {
+        return new Promise((resolve) => {
+            chrome.storage.local.get(['autoRecordPermissions'], (result) => {
+                // Get service-specific permission for Zoom
+                autoRecordEnabled = result.autoRecordPermissions?.['zoom'] || false;
+                console.log("🔐 Auto record enabled for zoom:", autoRecordEnabled);
+                resolve(autoRecordEnabled);
             });
-        }
+        });
+    }
 
-        // IMPROVED MEETING DETECTION
-        function startMeetingDetection() {
-            console.log("🚀 Starting Zoom meeting detection...");
+    // IMPROVED MEETING DETECTION
+    function startMeetingDetection() {
+        console.log("🚀 Starting Zoom meeting detection...");
             
-            let lastState = false;
-            let detectionCount = 0;
+        let lastState = false;
+        let detectionCount = 0;
             
-            const detectionInterval = setInterval(() => {
-                detectionCount++;
+        const detectionInterval = setInterval(() => {
+            detectionCount++;
                 
-                // MULTIPLE DETECTION METHODS
-                const meetingIndicators = [
-                    // Main meeting container
-                    document.querySelector('.main-body-layout_mainBody__YKEeP'),
-                    // Video container
-                    document.querySelector('.video-layout'),
-                    // Active speaker
-                    document.querySelector('.active-speaker'),
-                    // Gallery view
-                    document.querySelector('.gallery-view'),
-                    // Meeting container
-                    document.querySelector('[data-meeting="true"]'),
-                    // Video element with specific classes
-                    document.querySelector('.video-window'),
-                    // Zoom specific selectors
-                    document.querySelector('.zm-btn.join-audio-by-voip__join-btn'),
-                    document.querySelector('.footer-button-base__button-edge'),
-                    document.querySelector('[aria-label*="meeting"]'),
-                    document.querySelector('.video-container')
-                ].filter(el => {
-                    if (!el) return false;
-                    const rect = el.getBoundingClientRect();
-                    return rect.width > 300 && rect.height > 200;
-                });
+            // MULTIPLE DETECTION METHODS
+            const meetingIndicators = [
+                // Main meeting container
+                document.querySelector('.main-body-layout_mainBody__YKEeP'),
+                // Video container
+                document.querySelector('.video-layout'),
+                // Active speaker
+                document.querySelector('.active-speaker'),
+                // Gallery view
+                document.querySelector('.gallery-view'),
+                // Meeting container
+                document.querySelector('[data-meeting="true"]'),
+                // Video element with specific classes
+                document.querySelector('.video-window'),
+                // Zoom specific selectors
+                document.querySelector('.zm-btn.join-audio-by-voip__join-btn'),
+                document.querySelector('.footer-button-base__button-edge'),
+                document.querySelector('[aria-label*="meeting"]'),
+                document.querySelector('.video-container')
+            ].filter(el => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                return rect.width > 300 && rect.height > 200;
+            });
 
-                const meetingDetected = meetingIndicators.length > 0;
+            const meetingDetected = meetingIndicators.length > 0;
                 
-                console.log("🔍 Zoom meeting check:", {
-                    attempt: detectionCount,
-                    meetingDetected: meetingDetected,
-                    isInMeeting: isInMeeting,
-                    indicators: meetingIndicators.length
-                });
+            console.log("🔍 Zoom meeting check:", {
+                attempt: detectionCount,
+                meetingDetected: meetingDetected,
+                isInMeeting: isInMeeting,
+                indicators: meetingIndicators.length
+            });
                 
-                if (meetingDetected && !lastState && !isInMeeting) {
-                    console.log("🎯 ZOOM MEETING STARTED DETECTED!");
-                    startMeetingWithDelay();
-                } else if (!meetingDetected && lastState && isInMeeting) {
-                    console.log("🛑 ZOOM MEETING ENDED DETECTED!");
-                    meetingEnded();
-                }
+            if (meetingDetected && !lastState && !isInMeeting) {
+                console.log("🎯 ZOOM MEETING STARTED DETECTED!");
+                startMeetingWithDelay();
+            } else if (!meetingDetected && lastState && isInMeeting) {
+                console.log("🛑 ZOOM MEETING ENDED DETECTED!");
+                meetingEnded();
+            }
                 
-                lastState = meetingDetected;
+            lastState = meetingDetected;
                 
-                // Stop detection after 30 attempts to prevent infinite loop
-                if (detectionCount >= 30) {
-                    console.log("⏹️ Stopping Zoom meeting detection after 30 attempts");
-                    clearInterval(detectionInterval);
-                }
-            }, 3000);
-        }
+            // Stop detection after 30 attempts to prevent infinite loop
+            if (detectionCount >= 30) {
+                console.log("⏹️ Stopping Zoom meeting detection after 30 attempts");
+                clearInterval(detectionInterval);
+            }
+        }, 3000);
+    }
 
-        // NUCLEAR OPTION - ABSOLUTELY CERTAIN END BUTTON DETECTION
-        function setupEndButtonDetection() {
-            console.log("🖱️ ZOOM NUCLEAR OPTION - Setting up ABSOLUTE End button detection...");
+    // NUCLEAR OPTION - ABSOLUTELY CERTAIN END BUTTON DETECTION
+    function setupEndButtonDetection() {
+        console.log("🖱️ ZOOM NUCLEAR OPTION - Setting up ABSOLUTE End button detection...");
 
-            // METHOD 1: INTERCEPT ALL BUTTON CLICKS ON THE ENTIRE PAGE
-            document.addEventListener('click', function(event) {
-                console.log("🖱️ ZOOM NUCLEAR: Global click detected");
+        // METHOD 1: INTERCEPT ALL BUTTON CLICKS ON THE ENTIRE PAGE
+        document.addEventListener('click', function(event) {
+            console.log("🖱️ ZOOM NUCLEAR: Global click detected");
                 
-                const target = event.target;
+            const target = event.target;
                 
-                // Check if this is ANY button that could be leave/end related
-                if (target.tagName === 'BUTTON') {
-                    const buttonText = (target.textContent || '').trim().toLowerCase();
-                    const buttonHtml = target.outerHTML.toLowerCase();
+            // Check if this is ANY button that could be leave/end related
+            if (target.tagName === 'BUTTON') {
+                const buttonText = (target.textContent || '').trim().toLowerCase();
+                const buttonHtml = target.outerHTML.toLowerCase();
                     
-                    console.log("🖱️ ZOOM NUCLEAR: Button clicked - Text:", buttonText);
+                console.log("🖱️ ZOOM NUCLEAR: Button clicked - Text:", buttonText);
                     
-                    // EXTREMELY BROAD DETECTION - catch ANY leave/end related button
-                    if (buttonText.includes('leave') || 
-                        buttonText.includes('end') ||
-                        buttonText.includes('leave meeting') ||
-                        buttonText.includes('end meeting') ||
-                        buttonHtml.includes('leave') ||
-                        buttonHtml.includes('end') ||
-                        target.className.includes('leave') ||
-                        target.className.includes('end') ||
-                        target.id.includes('leave') ||
-                        target.id.includes('end')) {
+                // EXTREMELY BROAD DETECTION - catch ANY leave/end related button
+                if (buttonText.includes('leave') || 
+                    buttonText.includes('end') ||
+                    buttonText.includes('leave meeting') ||
+                    buttonText.includes('end meeting') ||
+                    buttonHtml.includes('leave') ||
+                    buttonHtml.includes('end') ||
+                    target.className.includes('leave') ||
+                    target.className.includes('end') ||
+                    target.id.includes('leave') ||
+                    target.id.includes('end')) {
                         
-                        console.log("🎯 ZOOM NUCLEAR: LEAVE/END BUTTON DETECTED!", buttonText);
-                        console.log("🔍 Button details:", {
-                            text: buttonText,
-                            className: target.className,
-                            id: target.id,
-                            html: target.outerHTML.substring(0, 200)
-                        });
+                    console.log("🎯 ZOOM NUCLEAR: LEAVE/END BUTTON DETECTED!", buttonText);
+                    console.log("🔍 Button details:", {
+                        text: buttonText,
+                        className: target.className,
+                        id: target.id,
+                        html: target.outerHTML.substring(0, 200)
+                    });
                         
-                        // STOP EVERYTHING IMMEDIATELY
-                        event.stopImmediatePropagation();
-                        event.preventDefault();
+                    // STOP EVERYTHING IMMEDIATELY
+                    event.stopImmediatePropagation();
+                    event.preventDefault();
                         
-                        // Force stop recording
-                        forceStopRecording();
-                        return;
-                    }
+                    // Force stop recording
+                    forceStopRecording();
+                    return;
                 }
+            }
                 
-                // Also check if click is inside a button
-                const buttonParent = target.closest('button');
-                if (buttonParent) {
-                    const buttonText = (buttonParent.textContent || '').trim().toLowerCase();
-                    console.log("🖱️ ZOOM NUCLEAR: Click inside button - Text:", buttonText);
+            // Also check if click is inside a button
+            const buttonParent = target.closest('button');
+            if (buttonParent) {
+                const buttonText = (buttonParent.textContent || '').trim().toLowerCase();
+                console.log("🖱️ ZOOM NUCLEAR: Click inside button - Text:", buttonText);
                     
-                    if (buttonText.includes('leave') || buttonText.includes('end')) {
-                        console.log("🎯 ZOOM NUCLEAR: LEAVE/END BUTTON (PARENT) DETECTED!", buttonText);
-                        event.stopImmediatePropagation();
-                        event.preventDefault();
-                        forceStopRecording();
-                        return;
-                    }
+                if (buttonText.includes('leave') || buttonText.includes('end')) {
+                    console.log("🎯 ZOOM NUCLEAR: LEAVE/END BUTTON (PARENT) DETECTED!", buttonText);
+                    event.stopImmediatePropagation();
+                    event.preventDefault();
+                    forceStopRecording();
+                    return;
                 }
-            }, true); // CAPTURE PHASE - MOST AGGRESSIVE
+            }
+        }, true); // CAPTURE PHASE - MOST AGGRESSIVE
 
             // METHOD 2: MONITOR URL CHANGES - WHEN MEETING ENDS, URL CHANGES
             let lastUrl = window.location.href;
@@ -2078,7 +2079,7 @@ function broadcastToZoomTab(message, duration = 4000) {
             // Show initial status based on auto-record setting
             checkAutoRecordPermission().then((enabled) => {
                 if (enabled) {
-                    showZoomStatus("✅ Zoom Auto Recording Enabled", 3000);
+                    showZoomStatus("✅ Zoom Auto Recording Enabled \nPermission needed - please click the extension icon once to grant access", 3000);
                 } else {
                     showZoomStatus("✅ Zoom Recorder Ready - Manual mode", 3000);
                 }
