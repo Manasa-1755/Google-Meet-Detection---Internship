@@ -64,20 +64,9 @@ A Chrome extension that records meetings on Google Meet, Microsoft Teams, and Zo
    - Click "Stop & Download"
    - Recording stops and file downloads immediately
 
-## File Structure
+## File Structure & Description
 
-**meeting-recorder/** folder contains:
-- manifest.json
-- background.js
-- content.js
-- popup.html
-- popup.js
-- recorder.html
-- recorder.js
-- README.md
-
-
-**File Descriptions:**
+**meeting-recorder/** file contains:
 - **manifest.json** - Extension configuration and permissions
 - **background.js** - Main service worker and central controller  
 - **content.js** - Meeting detection scripts for all platforms
