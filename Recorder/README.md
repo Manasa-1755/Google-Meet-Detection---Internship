@@ -83,7 +83,7 @@ A Chrome extension that records meetings on Google Meet, Microsoft Teams, and Zo
 - Uses Chrome Extensions API (Manifest V3)
 - Implements WebRTC MediaRecorder for recording
 - Uses Web Audio API for audio mixing
-- Chrome Storage API for data persistence
+- Chrome Storage API (local storage) for data persistence
 
 ## Troubleshooting
 
