@@ -127,11 +127,4 @@ A Chrome extension that records meetings on Google Meet, Microsoft Teams, and Zo
 3. Make code changes
 4. Reload the extension to test changes
 
-## License
-
-MIT License - see LICENSE file for details
-
-## Support
-
-For issues and questions, please check the troubleshooting section above or create an issue in the repository.
 
