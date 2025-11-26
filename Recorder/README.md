@@ -68,7 +68,6 @@ A Chrome extension that records meetings on Google Meet, Microsoft Teams, and Zo
 
 
 meeting-recorder/
-│
 ├── manifest.json
 ├── background.js
 ├── content.js
